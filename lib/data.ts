@@ -50,6 +50,8 @@ function toTemplate(t: {
   description: string | null;
   base_labor_hours: number;
   base_material_cost: number;
+  pricing_model: string | null;
+  unit_price: number | null;
   complexity_multipliers: unknown;
   required_fields: unknown;
 }): Template {
@@ -61,6 +63,8 @@ function toTemplate(t: {
     description: t.description,
     baseLaborHours: t.base_labor_hours,
     baseMaterialCost: t.base_material_cost,
+    pricingModel: t.pricing_model ?? "hourly",
+    unitPrice: t.unit_price ?? 0,
     complexityMultipliers: t.complexity_multipliers as Record<string, number> | null,
     requiredFields: t.required_fields as Record<string, unknown> | null,
   };

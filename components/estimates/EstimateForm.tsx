@@ -80,8 +80,8 @@ export function EstimateForm({ className }: EstimateFormProps) {
     }));
   }, [template]);
 
-  // Calculate estimate range based on template and parameters
-  const estimateRange = useMemo(() => {
+  // Calculate estimate based on template and parameters
+  const estimateAmount = useMemo(() => {
     if (!template) return null;
 
     const complexityLevel = COMPLEXITY_LEVELS.find(
@@ -89,14 +89,37 @@ export function EstimateForm({ className }: EstimateFormProps) {
     );
     const multiplier = complexityLevel?.multiplier ?? 1.0;
 
-    const hourlyRate = profile?.hourly_rate ?? 75;
-    const laborCost = template.baseLaborHours * hourlyRate * multiplier;
-    const materialCost = template.baseMaterialCost * multiplier;
+    let baseCost = 0;
 
-    const baseCost = laborCost + materialCost;
+    // Calculate based on pricing model
+    const pricingModel = template.pricingModel ?? "hourly";
 
-    // Apply parameter-based adjustments
-    let adjustedCost = baseCost;
+    if (pricingModel === "hourly") {
+      // Hourly pricing: hours * hourly rate * complexity
+      const hourlyRate = profile?.hourly_rate ?? 75;
+      baseCost = template.baseLaborHours * hourlyRate * multiplier;
+      // Add material cost
+      baseCost += template.baseMaterialCost * multiplier;
+    } else if (pricingModel === "per_sqft") {
+      // Per square foot pricing
+      const sqft = Number(parameters.squareFeet || parameters.sqft || 0);
+      baseCost = sqft * template.unitPrice * multiplier;
+      // Add material cost if any
+      baseCost += template.baseMaterialCost * multiplier;
+    } else if (pricingModel === "per_linear_ft") {
+      // Per linear foot pricing
+      const linearFt = Number(parameters.linearFeet || parameters.linear_ft || 0);
+      baseCost = linearFt * template.unitPrice * multiplier;
+      // Add material cost if any
+      baseCost += template.baseMaterialCost * multiplier;
+    } else {
+      // Custom pricing: use old method with multipliers
+      const hourlyRate = profile?.hourly_rate ?? 75;
+      baseCost = template.baseLaborHours * hourlyRate * multiplier;
+      baseCost += template.baseMaterialCost * multiplier;
+    }
+
+    // Apply parameter-based adjustments from complexity multipliers
     if (
       template.complexityMultipliers &&
       typeof template.complexityMultipliers === "object"
@@ -107,21 +130,18 @@ export function EstimateForm({ className }: EstimateFormProps) {
       >;
       Object.entries(parameters).forEach(([key, value]) => {
         if (multipliers[key] && typeof value === "number") {
-          adjustedCost += value * multipliers[key];
+          baseCost += value * multipliers[key];
         }
       });
     }
 
-    // Get range percentage based on estimate mode
-    const mode = ESTIMATE_MODES.find((m) => m.value === estimateMode);
-    const rangePercentage = mode?.rangePercentage ?? 0.25;
+    // Apply estimate mode buffer
+    // Ballpark adds 15% buffer, exact is precise
+    const finalAmount = estimateMode === "ballpark"
+      ? baseCost * 1.15
+      : baseCost;
 
-    // Calculate range using mode's percentage
-    // For exact mode (rangePercentage = 0), both low and high are the same
-    const low = adjustedCost * (1 - rangePercentage);
-    const high = adjustedCost * (1 + rangePercentage);
-
-    return { low, high, isExact: rangePercentage === 0 };
+    return finalAmount;
   }, [template, complexity, parameters, estimateMode, profile?.hourly_rate]);
 
   const handleParameterChange = useCallback(
@@ -177,7 +197,7 @@ export function EstimateForm({ className }: EstimateFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate() || !estimateRange || !profile || !template) return;
+    if (!validate() || !estimateAmount || !profile || !template) return;
 
     setIsSubmitting(true);
 
@@ -191,8 +211,8 @@ export function EstimateForm({ className }: EstimateFormProps) {
         homeownerPhone: homeownerPhone.trim() || undefined,
         projectDescription: projectDescription.trim() || undefined,
         parameters: { ...parameters, complexity },
-        rangeLow: estimateRange.low,
-        rangeHigh: estimateRange.high,
+        rangeLow: estimateAmount,
+        rangeHigh: estimateAmount,
         estimateMode: estimateMode,
       });
 
@@ -473,7 +493,7 @@ export function EstimateForm({ className }: EstimateFormProps) {
       </section>
 
       {/* Estimate Preview */}
-      {estimateRange && (
+      {estimateAmount && (
         <section className="rounded-xl border-2 border-blue-200 bg-blue-50 p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -481,30 +501,20 @@ export function EstimateForm({ className }: EstimateFormProps) {
             </div>
             <div>
               <h3 className="font-semibold text-blue-900">
-                {estimateRange.isExact ? "Exact Estimate" : "Estimated Range"}
+                {estimateMode === "exact" ? "Exact Estimate" : "Ballpark Estimate"}
               </h3>
-              <p className="text-sm text-blue-600">Based on your selections</p>
+              <p className="text-sm text-blue-600">
+                {estimateMode === "exact"
+                  ? "Precise calculation based on measurements"
+                  : "Quick estimate with 15% buffer included"}
+              </p>
             </div>
           </div>
           <div className="text-3xl font-bold text-blue-900">
-            {estimateRange.isExact ? (
-              `$${estimateRange.low.toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}`
-            ) : (
-              <>
-                ${estimateRange.low.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })}{" "}
-                -{" "}
-                ${estimateRange.high.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })}
-              </>
-            )}
+            ${estimateAmount.toLocaleString(undefined, {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            })}
           </div>
         </section>
       )}

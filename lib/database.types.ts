@@ -52,9 +52,11 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          pricing_model: string | null
           required_fields: Json | null
           template_name: string
           trade_type: string
+          unit_price: number | null
         }
         Insert: {
           base_labor_hours: number
@@ -64,9 +66,11 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          pricing_model?: string | null
           required_fields?: Json | null
           template_name: string
           trade_type: string
+          unit_price?: number | null
         }
         Update: {
           base_labor_hours?: number
@@ -76,9 +80,11 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          pricing_model?: string | null
           required_fields?: Json | null
           template_name?: string
           trade_type?: string
+          unit_price?: number | null
         }
         Relationships: [
           {

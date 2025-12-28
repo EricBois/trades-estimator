@@ -45,13 +45,38 @@ export const ESTIMATE_MODES = [
   {
     value: "ballpark",
     label: "Ballpark",
-    description: "Quick estimate with range",
-    rangePercentage: 0.25
+    description: "Quick estimate with 15% buffer added",
   },
   {
     value: "exact",
     label: "Exact",
-    description: "Precise calculation with single amount",
-    rangePercentage: 0
+    description: "Precise calculation based on measurements",
+  },
+] as const;
+
+export const PRICING_MODELS = [
+  {
+    value: "hourly",
+    label: "Hourly Rate",
+    description: "Bill by hours worked",
+    fields: ["estimatedHours"],
+  },
+  {
+    value: "per_sqft",
+    label: "Per Square Foot",
+    description: "Bill by square footage",
+    fields: ["squareFeet"],
+  },
+  {
+    value: "per_linear_ft",
+    label: "Per Linear Foot",
+    description: "Bill by linear footage (walls, trim, etc.)",
+    fields: ["linearFeet"],
+  },
+  {
+    value: "custom",
+    label: "Custom",
+    description: "Mixed or custom pricing",
+    fields: [],
   },
 ] as const;

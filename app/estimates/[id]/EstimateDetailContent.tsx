@@ -185,7 +185,7 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Estimate Range */}
+            {/* Estimate Amount */}
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
@@ -193,20 +193,15 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
                 </div>
                 <div>
                   <p className="text-blue-100 text-sm">
-                    {estimate.estimateMode === "exact" && estimate.rangeLow === estimate.rangeHigh
-                      ? "Exact Estimate"
-                      : "Estimated Range"}
+                    {estimate.estimateMode === "exact" ? "Exact Estimate" : "Ballpark Estimate"}
                   </p>
                   <p className="text-3xl font-bold">
-                    {estimate.estimateMode === "exact" && estimate.rangeLow === estimate.rangeHigh ? (
-                      `$${estimate.rangeLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                    ) : (
-                      <>
-                        ${estimate.rangeLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        {" - "}
-                        ${estimate.rangeHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      </>
-                    )}
+                    ${estimate.rangeLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">
+                    {estimate.estimateMode === "exact"
+                      ? "Precise calculation"
+                      : "Includes 15% buffer"}
                   </p>
                 </div>
               </div>

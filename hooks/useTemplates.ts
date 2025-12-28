@@ -14,6 +14,8 @@ export interface Template {
   description: string | null;
   baseLaborHours: number;
   baseMaterialCost: number;
+  pricingModel: string;
+  unitPrice: number;
   complexityMultipliers: Record<string, number> | null;
   requiredFields: Record<string, unknown> | null;
 }
@@ -44,6 +46,8 @@ export function useTemplates() {
         description: t.description,
         baseLaborHours: t.base_labor_hours,
         baseMaterialCost: t.base_material_cost,
+        pricingModel: t.pricing_model ?? "hourly",
+        unitPrice: t.unit_price ?? 0,
         complexityMultipliers: t.complexity_multipliers as Record<string, number> | null,
         requiredFields: t.required_fields as Record<string, unknown> | null,
       }));
@@ -73,6 +77,8 @@ export function useTemplate(templateId: string | null) {
         description: data.description,
         baseLaborHours: data.base_labor_hours,
         baseMaterialCost: data.base_material_cost,
+        pricingModel: data.pricing_model ?? "hourly",
+        unitPrice: data.unit_price ?? 0,
         complexityMultipliers: data.complexity_multipliers as Record<string, number> | null,
         requiredFields: data.required_fields as Record<string, unknown> | null,
       };
@@ -122,6 +128,8 @@ export function useCreateTemplate() {
         description: data.description,
         baseLaborHours: data.base_labor_hours,
         baseMaterialCost: data.base_material_cost,
+        pricingModel: data.pricing_model ?? "hourly",
+        unitPrice: data.unit_price ?? 0,
         complexityMultipliers: data.complexity_multipliers as Record<string, number> | null,
         requiredFields: data.required_fields as Record<string, unknown> | null,
       };
@@ -181,6 +189,8 @@ export function useUpdateTemplate() {
         description: data.description,
         baseLaborHours: data.base_labor_hours,
         baseMaterialCost: data.base_material_cost,
+        pricingModel: data.pricing_model ?? "hourly",
+        unitPrice: data.unit_price ?? 0,
         complexityMultipliers: data.complexity_multipliers as Record<string, number> | null,
         requiredFields: data.required_fields as Record<string, unknown> | null,
       };
