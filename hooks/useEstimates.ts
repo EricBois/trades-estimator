@@ -18,6 +18,7 @@ export interface Estimate {
   parameters: Record<string, unknown> | null;
   rangeLow: number;
   rangeHigh: number;
+  estimateMode: string;
   status: string;
   expiresAt: string | null;
   createdAt: string;
@@ -36,6 +37,7 @@ function toEstimate(e: {
   parameters: unknown;
   range_low: number;
   range_high: number;
+  estimate_mode: string | null;
   status: string | null;
   expires_at: string | null;
   created_at: string | null;
@@ -53,6 +55,7 @@ function toEstimate(e: {
     parameters: e.parameters as Record<string, unknown> | null,
     rangeLow: e.range_low,
     rangeHigh: e.range_high,
+    estimateMode: e.estimate_mode ?? "ballpark",
     status: e.status ?? "draft",
     expiresAt: e.expires_at,
     createdAt: e.created_at ?? new Date().toISOString(),
@@ -109,6 +112,7 @@ export interface CreateEstimateInput {
   parameters?: Record<string, unknown>;
   rangeLow: number;
   rangeHigh: number;
+  estimateMode?: string;
   expiresAt?: string;
 }
 
@@ -130,6 +134,7 @@ export function useCreateEstimate() {
           parameters: (input.parameters ?? null) as Json,
           range_low: input.rangeLow,
           range_high: input.rangeHigh,
+          estimate_mode: input.estimateMode ?? "ballpark",
           status: "draft",
           expires_at: input.expiresAt ?? null,
         })
@@ -166,6 +171,7 @@ export function useUpdateEstimate() {
           parameters: updates.parameters as Json,
           range_low: updates.rangeLow,
           range_high: updates.rangeHigh,
+          estimate_mode: updates.estimateMode,
           status: updates.status,
           expires_at: updates.expiresAt,
         })

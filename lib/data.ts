@@ -15,6 +15,7 @@ function toEstimate(e: {
   parameters: unknown;
   range_low: number;
   range_high: number;
+  estimate_mode: string | null;
   status: string | null;
   expires_at: string | null;
   created_at: string | null;
@@ -32,6 +33,7 @@ function toEstimate(e: {
     parameters: e.parameters as Record<string, unknown> | null,
     rangeLow: e.range_low,
     rangeHigh: e.range_high,
+    estimateMode: e.estimate_mode ?? "ballpark",
     status: e.status ?? "draft",
     expiresAt: e.expires_at,
     createdAt: e.created_at ?? new Date().toISOString(),

@@ -40,3 +40,18 @@ export const COMPLEXITY_LEVELS = [
   { value: "complex", label: "Complex", multiplier: 1.3 },
   { value: "premium", label: "Premium", multiplier: 1.6 },
 ] as const;
+
+export const ESTIMATE_MODES = [
+  {
+    value: "ballpark",
+    label: "Ballpark",
+    description: "Quick estimate with range",
+    rangePercentage: 0.25
+  },
+  {
+    value: "exact",
+    label: "Exact",
+    description: "Precise calculation with single amount",
+    rangePercentage: 0
+  },
+] as const;

@@ -159,18 +159,34 @@ export function EstimateCard({ estimate, className }: EstimateCardProps) {
 
           {/* Price range */}
           <div className="text-right">
-            <div className="flex items-center gap-1 text-lg font-bold text-gray-900">
-              <DollarSign className="w-4 h-4" />
-              {estimate.rangeLow.toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-              {" - "}
-              {estimate.rangeHigh.toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-            </div>
+            {estimate.estimateMode === "exact" && estimate.rangeLow === estimate.rangeHigh ? (
+              <>
+                <div className="text-xs text-gray-500 mb-1">Exact</div>
+                <div className="flex items-center gap-1 text-lg font-bold text-gray-900">
+                  <DollarSign className="w-4 h-4" />
+                  {estimate.rangeLow.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-xs text-gray-500 mb-1">Range</div>
+                <div className="flex items-center gap-1 text-lg font-bold text-gray-900">
+                  <DollarSign className="w-4 h-4" />
+                  {estimate.rangeLow.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
+                  {" - "}
+                  {estimate.rangeHigh.toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Arrow */}

@@ -7,7 +7,7 @@ import { Calculator, User, Mail, Phone, FileText, Loader2 } from "lucide-react";
 import { TemplateSelector } from "./TemplateSelector";
 import { useTemplate, useCreateEstimate } from "@/hooks";
 import { useAuth } from "@/contexts/AuthContext";
-import { COMPLEXITY_LEVELS } from "@/lib/constants";
+import { COMPLEXITY_LEVELS, ESTIMATE_MODES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 interface SelectOption {
@@ -61,6 +61,7 @@ export function EstimateForm({ className }: EstimateFormProps) {
     {}
   );
   const [complexity, setComplexity] = useState("standard");
+  const [estimateMode, setEstimateMode] = useState("ballpark");
 
   // Form state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -111,12 +112,17 @@ export function EstimateForm({ className }: EstimateFormProps) {
       });
     }
 
-    // Range is ±15% of calculated cost
-    const low = adjustedCost * 0.85;
-    const high = adjustedCost * 1.15;
+    // Get range percentage based on estimate mode
+    const mode = ESTIMATE_MODES.find((m) => m.value === estimateMode);
+    const rangePercentage = mode?.rangePercentage ?? 0.25;
 
-    return { low, high };
-  }, [template, complexity, parameters, profile?.hourly_rate]);
+    // Calculate range using mode's percentage
+    // For exact mode (rangePercentage = 0), both low and high are the same
+    const low = adjustedCost * (1 - rangePercentage);
+    const high = adjustedCost * (1 + rangePercentage);
+
+    return { low, high, isExact: rangePercentage === 0 };
+  }, [template, complexity, parameters, estimateMode, profile?.hourly_rate]);
 
   const handleParameterChange = useCallback(
     (key: string, value: string | number) => {
@@ -187,6 +193,7 @@ export function EstimateForm({ className }: EstimateFormProps) {
         parameters: { ...parameters, complexity },
         rangeLow: estimateRange.low,
         rangeHigh: estimateRange.high,
+        estimateMode: estimateMode,
       });
 
       router.push(`/estimates/${estimate.id}`);
@@ -308,6 +315,35 @@ export function EstimateForm({ className }: EstimateFormProps) {
                   </p>
                 )}
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Estimate Mode Selector */}
+      {template && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Estimate Type
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {ESTIMATE_MODES.map((mode) => (
+              <button
+                key={mode.value}
+                type="button"
+                onClick={() => setEstimateMode(mode.value)}
+                className={cn(
+                  "px-5 py-4 rounded-lg border-2 text-left transition-colors",
+                  estimateMode === mode.value
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                )}
+              >
+                <div className="font-semibold text-base mb-1 text-gray-900">
+                  {mode.label}
+                </div>
+                <div className="text-sm text-gray-600">{mode.description}</div>
+              </button>
             ))}
           </div>
         </section>
@@ -444,20 +480,31 @@ export function EstimateForm({ className }: EstimateFormProps) {
               <Calculator className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-blue-900">Estimated Range</h3>
+              <h3 className="font-semibold text-blue-900">
+                {estimateRange.isExact ? "Exact Estimate" : "Estimated Range"}
+              </h3>
               <p className="text-sm text-blue-600">Based on your selections</p>
             </div>
           </div>
           <div className="text-3xl font-bold text-blue-900">
-            ${estimateRange.low.toLocaleString(undefined, {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}{" "}
-            -{" "}
-            ${estimateRange.high.toLocaleString(undefined, {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}
+            {estimateRange.isExact ? (
+              `$${estimateRange.low.toLocaleString(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}`
+            ) : (
+              <>
+                ${estimateRange.low.toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}{" "}
+                -{" "}
+                ${estimateRange.high.toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}
+              </>
+            )}
           </div>
         </section>
       )}

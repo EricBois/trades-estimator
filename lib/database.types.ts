@@ -94,6 +94,7 @@ export type Database = {
         Row: {
           contractor_id: string
           created_at: string | null
+          estimate_mode: string | null
           expires_at: string | null
           homeowner_email: string
           homeowner_name: string
@@ -113,6 +114,7 @@ export type Database = {
         Insert: {
           contractor_id: string
           created_at?: string | null
+          estimate_mode?: string | null
           expires_at?: string | null
           homeowner_email: string
           homeowner_name: string
@@ -132,6 +134,7 @@ export type Database = {
         Update: {
           contractor_id?: string
           created_at?: string | null
+          estimate_mode?: string | null
           expires_at?: string | null
           homeowner_email?: string
           homeowner_name?: string

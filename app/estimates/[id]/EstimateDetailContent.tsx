@@ -74,6 +74,7 @@ interface EstimateDetailContentProps {
     status: string;
     rangeLow: number;
     rangeHigh: number;
+    estimateMode: string;
     createdAt: string;
     updatedAt: string;
     expiresAt: string | null;
@@ -191,11 +192,21 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
                   <DollarSign className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-blue-100 text-sm">Estimated Range</p>
+                  <p className="text-blue-100 text-sm">
+                    {estimate.estimateMode === "exact" && estimate.rangeLow === estimate.rangeHigh
+                      ? "Exact Estimate"
+                      : "Estimated Range"}
+                  </p>
                   <p className="text-3xl font-bold">
-                    ${estimate.rangeLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    {" - "}
-                    ${estimate.rangeHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {estimate.estimateMode === "exact" && estimate.rangeLow === estimate.rangeHigh ? (
+                      `$${estimate.rangeLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    ) : (
+                      <>
+                        ${estimate.rangeLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        {" - "}
+                        ${estimate.rangeHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
