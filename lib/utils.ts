@@ -1,6 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { DateTime } from "@/node_modules/@types/luxon";
+import { DateTime } from "luxon";
 
 // Tailwind class merging utility
 export function cn(...inputs: Parameters<typeof clsx>) {
