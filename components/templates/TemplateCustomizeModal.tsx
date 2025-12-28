@@ -211,10 +211,10 @@ export function TemplateCustomizeModal({
       />
 
       {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
         <div className="relative bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
               Customize Template
             </h2>
@@ -227,7 +227,7 @@ export function TemplateCustomizeModal({
           </div>
 
           {/* Body */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-6">
+          <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-5 sm:space-y-6">
             {/* Basic Info */}
             <section className="space-y-4">
               <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
@@ -309,7 +309,7 @@ export function TemplateCustomizeModal({
                 Base Pricing
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label
                     htmlFor="baseLaborHours"
@@ -402,7 +402,7 @@ export function TemplateCustomizeModal({
                         <div className="text-gray-400 mt-2">
                           <GripVertical className="w-4 h-4" />
                         </div>
-                        <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
                               Label
@@ -456,7 +456,7 @@ export function TemplateCustomizeModal({
 
                       {/* Number field options */}
                       {field.type === "number" && (
-                        <div className="grid grid-cols-3 gap-2 pl-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pl-6">
                           <div>
                             <label className="block text-xs font-medium text-gray-500 mb-1">
                               Min
@@ -518,7 +518,7 @@ export function TemplateCustomizeModal({
                             </p>
                           )}
                           {field.options?.map((option, optIndex) => (
-                            <div key={optIndex} className="flex items-center gap-2">
+                            <div key={optIndex} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                               <input
                                 type="text"
                                 value={option.value}
@@ -526,7 +526,7 @@ export function TemplateCustomizeModal({
                                   updateOption(index, optIndex, { value: e.target.value })
                                 }
                                 placeholder="Value"
-                                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                               <input
                                 type="text"
@@ -535,14 +535,14 @@ export function TemplateCustomizeModal({
                                   updateOption(index, optIndex, { label: e.target.value })
                                 }
                                 placeholder="Label"
-                                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                               <button
                                 type="button"
                                 onClick={() => removeOption(index, optIndex)}
-                                className="p-1 text-gray-400 hover:text-red-600 rounded"
+                                className="p-1.5 sm:p-1 text-gray-400 hover:text-red-600 rounded self-end sm:self-auto"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-4 h-4 sm:w-3 sm:h-3" />
                               </button>
                             </div>
                           ))}
@@ -581,16 +581,16 @@ export function TemplateCustomizeModal({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 font-medium hover:text-gray-900 transition-colors"
+              className="px-4 py-2.5 sm:py-2 text-gray-700 font-medium hover:text-gray-900 transition-colors text-center"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               Save Customizations
             </button>
