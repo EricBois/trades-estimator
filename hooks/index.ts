@@ -15,6 +15,6 @@ export {
 } from "./useEstimates";
 export type { Estimate, CreateEstimateInput } from "./useEstimates";
 export { useUpdateProfile } from "./useProfile";
-export type { UpdateProfileInput } from "./useProfile";
+export type { UpdateProfileInput, CustomRates, DrywallFinishingRates, DrywallAddonPrices } from "./useProfile";
 export { useCompleteOnboarding, useSkipOnboarding } from "./useTemplatesOnboarding";
 export type { TemplateCustomization, SelectedTemplate, CompleteOnboardingInput } from "./useTemplatesOnboarding";

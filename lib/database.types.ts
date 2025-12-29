@@ -169,6 +169,7 @@ export type Database = {
         Row: {
           company_name: string
           created_at: string | null
+          custom_rates: Json | null
           hidden_template_ids: string[] | null
           hourly_rate: number | null
           id: string
@@ -180,6 +181,7 @@ export type Database = {
         Insert: {
           company_name: string
           created_at?: string | null
+          custom_rates?: Json | null
           hidden_template_ids?: string[] | null
           hourly_rate?: number | null
           id: string
@@ -191,6 +193,7 @@ export type Database = {
         Update: {
           company_name?: string
           created_at?: string | null
+          custom_rates?: Json | null
           hidden_template_ids?: string[] | null
           hourly_rate?: number | null
           id?: string

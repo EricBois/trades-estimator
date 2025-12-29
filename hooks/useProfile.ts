@@ -5,6 +5,29 @@ import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
 
+// Custom rates structure for different trades
+export interface DrywallFinishingRates {
+  sqft_standard?: number;
+  sqft_premium?: number;
+  linear_joints?: number;
+  linear_corners?: number;
+}
+
+// Add-on prices (can be flat rate or per-unit)
+export interface DrywallAddonPrices {
+  sanding?: number;        // flat
+  primer?: number;         // per sqft
+  repair_holes?: number;   // per each
+  texture_match?: number;  // flat
+  high_ceiling?: number;   // per sqft
+  dust_barrier?: number;   // flat
+}
+
+export interface CustomRates {
+  drywall_finishing?: DrywallFinishingRates;
+  drywall_addons?: DrywallAddonPrices;
+}
+
 export interface UpdateProfileInput {
   id: string;
   companyName?: string;
@@ -14,6 +37,7 @@ export interface UpdateProfileInput {
   preferredTradeTypes?: string[] | null;
   hiddenTemplateIds?: string[];
   templatesOnboarded?: boolean;
+  customRates?: CustomRates | null;
 }
 
 export function useUpdateProfile() {
@@ -43,6 +67,9 @@ export function useUpdateProfile() {
       }
       if (input.templatesOnboarded !== undefined) {
         updates.templates_onboarded = input.templatesOnboarded;
+      }
+      if (input.customRates !== undefined) {
+        updates.custom_rates = input.customRates;
       }
 
       const { data, error } = await supabase
