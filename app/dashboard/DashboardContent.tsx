@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { EstimateCard, EstimateEmptyState } from "@/components/estimates";
+import { QuickTemplatesSection } from "@/components/dashboard";
 import type { Estimate } from "@/hooks";
 
 interface Stats {
@@ -95,6 +96,9 @@ export function DashboardContent({ stats, recentEstimates, profile }: DashboardC
             color="emerald"
           />
         </div>
+
+        {/* Quick Templates */}
+        <QuickTemplatesSection recentEstimates={recentEstimates} />
 
         {/* Recent Estimates */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

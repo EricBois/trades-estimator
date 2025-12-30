@@ -73,6 +73,7 @@ function toProfile(p: {
   service_areas: string[] | null;
   hidden_template_ids: string[] | null;
   templates_onboarded: boolean | null;
+  custom_rates: unknown;
   created_at: string | null;
   updated_at: string | null;
 }) {
@@ -84,6 +85,7 @@ function toProfile(p: {
     preferredTradeTypes: p.trade_type ? [p.trade_type] : null,
     hiddenTemplateIds: p.hidden_template_ids ?? [],
     templatesOnboarded: p.templates_onboarded ?? false,
+    customRates: p.custom_rates as { drywall_finishing?: { sqft_standard?: number; sqft_premium?: number; linear_joints?: number; linear_corners?: number } } | null,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };
