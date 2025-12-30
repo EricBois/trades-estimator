@@ -15,17 +15,37 @@ export interface DrywallFinishingRates {
 
 // Add-on prices (can be flat rate or per-unit)
 export interface DrywallAddonPrices {
-  sanding?: number;        // flat
-  primer?: number;         // per sqft
-  repair_holes?: number;   // per each
-  texture_match?: number;  // flat
-  high_ceiling?: number;   // per sqft
-  dust_barrier?: number;   // flat
+  sanding?: number; // flat
+  primer?: number; // per sqft
+  repair_holes?: number; // per each
+  texture_match?: number; // flat
+  high_ceiling?: number; // per sqft
+  dust_barrier?: number; // flat
+}
+
+// Drywall hanging (installation) rates
+export interface DrywallHangingRates {
+  labor_per_sheet?: number; // $/sheet
+  labor_per_sqft?: number; // $/sqft
+  material_markup?: number; // percentage (0-100)
+  default_waste_factor?: number; // decimal (0.10 = 10%)
+}
+
+// Drywall hanging add-on prices
+export interface DrywallHangingAddonPrices {
+  delivery?: number; // flat
+  stocking?: number; // per sqft
+  debris_removal?: number; // flat
+  corner_bead?: number; // per linear ft
+  insulation?: number; // per sqft
+  vapor_barrier?: number; // per sqft
 }
 
 export interface CustomRates {
   drywall_finishing?: DrywallFinishingRates;
   drywall_addons?: DrywallAddonPrices;
+  drywall_hanging?: DrywallHangingRates;
+  drywall_hanging_addons?: DrywallHangingAddonPrices;
 }
 
 export interface UpdateProfileInput {
@@ -87,4 +107,3 @@ export function useUpdateProfile() {
     },
   });
 }
-
