@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import { Wizard } from "react-use-wizard";
 import { WizardDataProvider, useWizardData } from "./WizardDataContext";
-import { WizardProgress } from "./WizardProgress";
 import { WizardNavigation } from "./WizardNavigation";
+import { createWizardWrapper, WizardOuterLayout } from "./WizardLayout";
 import { TemplateStep } from "./TemplateStep";
 import { QuantityStep } from "./QuantityStep";
 import { ComplexityStep } from "./ComplexityStep";
@@ -12,6 +12,18 @@ import { EstimatePreview } from "./EstimatePreview";
 import { SendEstimate } from "./SendEstimate";
 import { DrywallEstimateWizard } from "./trades/drywall/DrywallEstimateWizard";
 import { HangingEstimateWizard } from "./trades/hanging/HangingEstimateWizard";
+
+// Step configuration for the stepper
+const WIZARD_STEPS = [
+  { label: "Template" },
+  { label: "Details" },
+  { label: "Complexity" },
+  { label: "Preview" },
+  { label: "Send" },
+];
+
+// Create wrapper component outside of render
+const StandardWizardWrapper = createWizardWrapper(WIZARD_STEPS);
 
 interface EstimateWizardProps {
   initialTrade?: string;
@@ -28,19 +40,15 @@ function WizardContent({ initialTrade }: EstimateWizardProps) {
   }, [initialTrade, updateData]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <Wizard
-        header={<WizardProgress />}
-        footer={<WizardNavigation />}
-        wrapper={<StepWrapper />}
-      >
+    <WizardOuterLayout>
+      <Wizard footer={<WizardNavigation />} wrapper={<StandardWizardWrapper />}>
         <TemplateStep />
         <QuantityStep />
         <ComplexityStep />
         <EstimatePreview />
         <SendEstimate />
       </Wizard>
-    </div>
+    </WizardOuterLayout>
   );
 }
 
@@ -59,14 +67,5 @@ export function EstimateWizard({ initialTrade }: EstimateWizardProps) {
     <WizardDataProvider>
       <WizardContent initialTrade={initialTrade} />
     </WizardDataProvider>
-  );
-}
-
-// Wrapper component for consistent step layout
-function StepWrapper({ children }: { children?: React.ReactNode }) {
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="py-6 pb-28">{children}</div>
-    </div>
   );
 }

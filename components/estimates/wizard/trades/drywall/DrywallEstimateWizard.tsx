@@ -1,8 +1,8 @@
 "use client";
 
 import { Wizard } from "react-use-wizard";
-import { WizardProgress } from "../../WizardProgress";
 import { WizardNavigation } from "../../WizardNavigation";
+import { createWizardWrapper, WizardOuterLayout } from "../../WizardLayout";
 import { DrywallEstimateProvider } from "./DrywallEstimateContext";
 import { DrywallFinishLevelStep } from "./DrywallFinishLevelStep";
 import { DrywallLineItemsStep } from "./DrywallLineItemsStep";
@@ -11,25 +11,26 @@ import { DrywallComplexityStep } from "./DrywallComplexityStep";
 import { DrywallPreview } from "./DrywallPreview";
 import { DrywallSendEstimate } from "./DrywallSendEstimate";
 
-// Wrapper component for consistent step layout
-function StepWrapper({ children }: { children?: React.ReactNode }) {
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="py-6 pb-28">
-        {children}
-      </div>
-    </div>
-  );
-}
+// Step configuration for the drywall wizard
+const DRYWALL_STEPS = [
+  { label: "Finish Level" },
+  { label: "Line Items" },
+  { label: "Add-ons" },
+  { label: "Complexity" },
+  { label: "Preview" },
+  { label: "Send" },
+];
+
+// Create wrapper component outside of render
+const DrywallWizardWrapper = createWizardWrapper(DRYWALL_STEPS);
 
 export function DrywallEstimateWizard() {
   return (
     <DrywallEstimateProvider>
-      <div className="min-h-screen flex flex-col bg-gray-50">
+      <WizardOuterLayout>
         <Wizard
-          header={<WizardProgress />}
           footer={<WizardNavigation />}
-          wrapper={<StepWrapper />}
+          wrapper={<DrywallWizardWrapper />}
         >
           <DrywallFinishLevelStep />
           <DrywallLineItemsStep />
@@ -38,7 +39,7 @@ export function DrywallEstimateWizard() {
           <DrywallPreview />
           <DrywallSendEstimate />
         </Wizard>
-      </div>
+      </WizardOuterLayout>
     </DrywallEstimateProvider>
   );
 }

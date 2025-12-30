@@ -1,8 +1,8 @@
 "use client";
 
 import { Wizard } from "react-use-wizard";
-import { WizardProgress } from "../../WizardProgress";
 import { WizardNavigation } from "../../WizardNavigation";
+import { createWizardWrapper, WizardOuterLayout } from "../../WizardLayout";
 import {
   HangingEstimateProvider,
   useHangingEstimate,
@@ -16,14 +16,30 @@ import { HangingComplexityStep } from "./HangingComplexityStep";
 import { HangingPreview } from "./HangingPreview";
 import { HangingSendEstimate } from "./HangingSendEstimate";
 
-// Wrapper component for consistent step layout
-function StepWrapper({ children }: { children?: React.ReactNode }) {
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="py-6 pb-28">{children}</div>
-    </div>
-  );
-}
+// Step configuration for calculator mode (7 steps)
+const CALCULATOR_STEPS = [
+  { label: "Input Mode" },
+  { label: "Rooms" },
+  { label: "Sheet Type" },
+  { label: "Add-ons" },
+  { label: "Complexity" },
+  { label: "Preview" },
+  { label: "Send" },
+];
+
+// Step configuration for direct mode (6 steps)
+const DIRECT_STEPS = [
+  { label: "Input Mode" },
+  { label: "Measurements" },
+  { label: "Add-ons" },
+  { label: "Complexity" },
+  { label: "Preview" },
+  { label: "Send" },
+];
+
+// Create wrapper components outside of render
+const CalculatorWizardWrapper = createWizardWrapper(CALCULATOR_STEPS);
+const DirectWizardWrapper = createWizardWrapper(DIRECT_STEPS);
 
 // Inner wizard that can access context
 function HangingWizardInner() {
@@ -33,13 +49,12 @@ function HangingWizardInner() {
   // Calculator: InputMode -> Rooms -> SheetType -> Addons -> Complexity -> Preview -> Send
   // Direct:     InputMode -> DirectEntry -> Addons -> Complexity -> Preview -> Send
 
+  const WizardWrapper =
+    inputMode === "calculator" ? CalculatorWizardWrapper : DirectWizardWrapper;
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <Wizard
-        header={<WizardProgress />}
-        footer={<WizardNavigation />}
-        wrapper={<StepWrapper />}
-      >
+    <WizardOuterLayout>
+      <Wizard footer={<WizardNavigation />} wrapper={<WizardWrapper />}>
         {/* Step 0: Input Mode Selection */}
         <HangingInputModeStep />
 
@@ -53,7 +68,7 @@ function HangingWizardInner() {
         <HangingPreview />
         <HangingSendEstimate />
       </Wizard>
-    </div>
+    </WizardOuterLayout>
   );
 }
 
