@@ -16,6 +16,7 @@ import {
   getSheetMaterialCost,
   getSheetLaborCost,
   getUserDefaultWasteFactor,
+  getUserLaborPerSqft,
 } from "@/lib/trades/drywallHanging/rates";
 import {
   calculateRoomSqft,
@@ -92,9 +93,13 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
   const { profile } = useAuth();
 
   // State
-  const [inputMode, setInputMode] = useState<HangingInputMode>("calculator");
+  const [inputMode, setInputModeState] =
+    useState<HangingInputMode>("calculator");
   const [pricingMethod, setPricingMethod] =
     useState<HangingPricingMethod>("per_sheet");
+  const [clientSuppliesMaterials, setClientSuppliesMaterialsState] =
+    useState<boolean>(false);
+  const [directSqft, setDirectSqftState] = useState<number>(0);
   const [rooms, setRooms] = useState<HangingRoom[]>([]);
   const [sheets, setSheets] = useState<HangingSheetEntry[]>([]);
   const [ceilingFactor, setCeilingFactor] =
@@ -687,10 +692,49 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     [customRates]
   );
 
+  // Input mode setter with side effects for labor_only mode
+  const setInputMode = useCallback((mode: HangingInputMode) => {
+    setInputModeState(mode);
+    if (mode === "labor_only") {
+      // When switching to labor_only, set pricing to per_sqft and enable client supplies materials
+      setPricingMethod("per_sqft");
+      setClientSuppliesMaterialsState(true);
+    } else {
+      // When switching away from labor_only, reset to per_sheet pricing
+      setPricingMethod("per_sheet");
+    }
+  }, []);
+
+  // Client supplies materials setter - also updates all sheets
+  const setClientSuppliesMaterials = useCallback((value: boolean) => {
+    setClientSuppliesMaterialsState(value);
+    // Update all existing sheets to match
+    setSheets((prev) =>
+      prev.map((sheet) => {
+        const updated = { ...sheet, includeMaterial: !value };
+        // Recalculate totals
+        const effectiveMaterial = updated.includeMaterial
+          ? updated.materialCostOverride ?? updated.materialCost
+          : 0;
+        const effectiveLabor = updated.laborCostOverride ?? updated.laborCost;
+        updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+        updated.subtotal = updated.totalPerSheet * updated.quantity;
+        return updated;
+      })
+    );
+  }, []);
+
+  // Direct sqft setter for labor_only mode
+  const setDirectSqft = useCallback((sqft: number) => {
+    setDirectSqftState(sqft);
+  }, []);
+
   // Reset all state
   const reset = useCallback(() => {
-    setInputMode("calculator");
+    setInputModeState("calculator");
     setPricingMethod("per_sheet");
+    setClientSuppliesMaterialsState(false);
+    setDirectSqftState(0);
     setRooms([]);
     setSheets([]);
     setCeilingFactor("standard");
@@ -701,6 +745,50 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
 
   // Calculate totals
   const totals = useMemo((): HangingEstimateTotals => {
+    // Get labor per sqft rate for per_sqft pricing
+    const laborPerSqft = getUserLaborPerSqft(customRates);
+
+    // Handle labor_only mode with per_sqft pricing
+    if (inputMode === "labor_only" && pricingMethod === "per_sqft") {
+      const totalSqft = directSqft;
+
+      // Labor only calculation - no materials, just sqft * rate
+      const ceilingFactorInfo = getCeilingFactor(ceilingFactor);
+      const ceilingMultiplier = ceilingFactorInfo?.multiplier ?? 1;
+      const laborSubtotal = totalSqft * laborPerSqft * ceilingMultiplier;
+
+      // No material cost in labor_only mode
+      const materialSubtotal = 0;
+
+      // Addons subtotal
+      const addonsSubtotal = addons.reduce((sum, a) => sum + a.total, 0);
+
+      // Subtotal
+      const subtotal = materialSubtotal + laborSubtotal + addonsSubtotal;
+
+      // Complexity adjustment
+      const complexityMultiplier = HANGING_COMPLEXITY_MULTIPLIERS[complexity];
+      const complexityAdjustment = subtotal * (complexityMultiplier - 1);
+
+      // Total
+      const total = subtotal + complexityAdjustment;
+
+      return {
+        totalSqft: Math.round(totalSqft * 100) / 100,
+        sheetsNeeded: 0, // No sheets in labor_only mode
+        materialSubtotal: 0,
+        laborSubtotal: Math.round(laborSubtotal * 100) / 100,
+        addonsSubtotal: Math.round(addonsSubtotal * 100) / 100,
+        subtotal: Math.round(subtotal * 100) / 100,
+        complexityMultiplier,
+        complexityAdjustment: Math.round(complexityAdjustment * 100) / 100,
+        total: Math.round(total * 100) / 100,
+        costPerSqft: laborPerSqft * ceilingMultiplier * complexityMultiplier,
+        costPerSheet: 0,
+      };
+    }
+
+    // Standard calculation for calculator/direct modes (per_sheet pricing)
     // Total sqft from rooms or estimated from sheets
     const roomTotals = calculateTotalRoomsSqft(rooms);
     const totalSqft =
@@ -760,12 +848,24 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       costPerSqft: Math.round(costPerSqft * 100) / 100,
       costPerSheet: Math.round(costPerSheet * 100) / 100,
     };
-  }, [inputMode, rooms, sheets, ceilingFactor, complexity, addons]);
+  }, [
+    inputMode,
+    pricingMethod,
+    directSqft,
+    rooms,
+    sheets,
+    ceilingFactor,
+    complexity,
+    addons,
+    customRates,
+  ]);
 
   return {
     // Data
     inputMode,
     pricingMethod,
+    clientSuppliesMaterials,
+    directSqft,
     rooms,
     sheets,
     ceilingFactor,
@@ -779,6 +879,8 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     // Actions
     setInputMode,
     setPricingMethod,
+    setClientSuppliesMaterials,
+    setDirectSqft,
     addRoom,
     updateRoom,
     removeRoom,

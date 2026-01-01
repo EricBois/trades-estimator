@@ -22,6 +22,7 @@ export type {
   DrywallAddonPrices,
   PaintingRates,
   PaintingAddonPrices,
+  FinishingMaterialPrices,
 } from "./useProfile";
 export {
   useCompleteOnboarding,
@@ -49,3 +50,25 @@ export type {
   UpdateProjectInput,
   UseProjectEstimateReturn,
 } from "./project";
+
+// Contractor materials hooks
+export {
+  useContractorMaterials,
+  useAllMaterials,
+  usePresetMaterials,
+  usePresetsWithOverrides,
+  useContractorMaterialsByCategory,
+  useCreateContractorMaterial,
+  useUpdateContractorMaterial,
+  useDeleteContractorMaterial,
+  useToggleMaterialActive,
+  useSetPresetOverride,
+  useRemovePresetOverride,
+  MATERIAL_CATEGORIES,
+} from "./useContractorMaterials";
+export type {
+  ContractorMaterial,
+  CreateMaterialInput,
+  UpdateMaterialInput,
+  MaterialCategory,
+} from "./useContractorMaterials";

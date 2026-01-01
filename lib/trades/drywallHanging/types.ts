@@ -10,7 +10,7 @@ import {
 } from "@/hooks/useProfile";
 
 // Input mode
-export type HangingInputMode = "calculator" | "direct";
+export type HangingInputMode = "calculator" | "direct" | "labor_only";
 
 // Pricing method
 export type HangingPricingMethod = "per_sheet" | "per_sqft";
@@ -129,6 +129,8 @@ export interface HangingSelectedAddon {
 export interface DrywallHangingEstimateData {
   inputMode: HangingInputMode;
   pricingMethod: HangingPricingMethod;
+  clientSuppliesMaterials: boolean; // When true, all sheets labor-only
+  directSqft: number; // For labor_only mode - direct sqft entry
   rooms: HangingRoom[];
   sheets: HangingSheetEntry[];
   ceilingFactor: CeilingHeightFactor;
@@ -158,6 +160,8 @@ export interface DrywallHangingEstimateActions {
   // Mode & pricing
   setInputMode: (mode: HangingInputMode) => void;
   setPricingMethod: (method: HangingPricingMethod) => void;
+  setClientSuppliesMaterials: (value: boolean) => void;
+  setDirectSqft: (sqft: number) => void;
   // Room management (calculator mode)
   addRoom: (name?: string) => string;
   updateRoom: (

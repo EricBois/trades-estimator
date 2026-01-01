@@ -223,6 +223,59 @@ export type Database = {
         };
         Relationships: [];
       };
+      contractor_materials: {
+        Row: {
+          id: string;
+          contractor_id: string | null; // NULL = preset/global material
+          preset_id: string | null; // If set, this is an override of a preset
+          name: string;
+          category: string;
+          unit: string;
+          unit_size: string | null;
+          base_price: number;
+          description: string | null;
+          is_active: boolean;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          contractor_id?: string | null; // NULL = preset/global material
+          preset_id?: string | null;
+          name: string;
+          category: string;
+          unit: string;
+          unit_size?: string | null;
+          base_price: number;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          contractor_id?: string | null;
+          preset_id?: string | null;
+          name?: string;
+          category?: string;
+          unit?: string;
+          unit_size?: string | null;
+          base_price?: number;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contractor_materials_contractor_id_fkey";
+            columns: ["contractor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       project_room_overrides: {
         Row: {
           created_at: string | null;

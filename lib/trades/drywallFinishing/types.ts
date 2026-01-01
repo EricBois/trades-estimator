@@ -46,10 +46,13 @@ export type FinishingMaterialId =
 // A material entry in the estimate
 export interface FinishingMaterialEntry {
   id: string; // unique instance id
-  materialId: FinishingMaterialId;
+  materialId: FinishingMaterialId | string; // preset ID or custom material UUID
+  isCustom: boolean; // true for custom materials from database
   category: FinishingMaterialCategory;
+  name: string; // display name (from preset or custom material)
+  unit: string; // unit of measurement
   quantity: number;
-  unitPrice: number; // base price from constants
+  unitPrice: number; // base price from constants or custom material
   // Override fields
   priceOverride?: number;
   hasOverride: boolean;
@@ -145,6 +148,14 @@ export interface DrywallEstimateActions {
   setLineItemLaborOverride: (id: string, override: number | undefined) => void;
   // Manual material management
   addMaterial: (materialId: FinishingMaterialId, quantity?: number) => void;
+  addCustomMaterial: (
+    customMaterialId: string,
+    name: string,
+    category: FinishingMaterialCategory,
+    unit: string,
+    basePrice: number,
+    quantity?: number
+  ) => void;
   updateMaterial: (
     id: string,
     updates: Partial<Omit<FinishingMaterialEntry, "id" | "subtotal">>

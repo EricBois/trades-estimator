@@ -1,7 +1,7 @@
 "use client";
 
 import { useWizard } from "react-use-wizard";
-import { Calculator, Grid3X3 } from "lucide-react";
+import { Calculator, Grid3X3, Hammer } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
 import { HangingInputMode } from "@/lib/trades/drywallHanging/types";
 import { StepHeader } from "@/components/ui/StepHeader";
@@ -19,6 +19,12 @@ const INPUT_MODES = [
     label: "Enter Sheets Directly",
     description: "Manually specify sheet types and quantities",
     icon: Grid3X3,
+  },
+  {
+    value: "labor_only" as HangingInputMode,
+    label: "Labor Only",
+    description: "Client supplies materials - charge by square footage",
+    icon: Hammer,
   },
 ];
 

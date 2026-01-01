@@ -372,16 +372,51 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
       const materialDef = getFinishingMaterial(materialId);
       if (!materialDef) return;
 
-      const unitPrice = materialDef.price;
+      // Check for user's price override from settings
+      const overridePrice =
+        customRates?.finishing_material_prices?.[materialId];
+      const unitPrice = overridePrice ?? materialDef.price;
+
       const newEntry: FinishingMaterialEntry = {
         id: generateId(),
         materialId,
+        isCustom: false,
         category: materialDef.category as FinishingMaterialCategory,
+        name: materialDef.label,
+        unit: materialDef.unit,
         quantity,
         unitPrice,
         priceOverride: undefined,
         hasOverride: false,
         subtotal: unitPrice * quantity,
+      };
+      setMaterials((prev) => [...prev, newEntry]);
+    },
+    [customRates]
+  );
+
+  // Add a custom material from the contractor_materials table
+  const addCustomMaterial = useCallback(
+    (
+      customMaterialId: string,
+      name: string,
+      category: FinishingMaterialCategory,
+      unit: string,
+      basePrice: number,
+      quantity: number = 1
+    ) => {
+      const newEntry: FinishingMaterialEntry = {
+        id: generateId(),
+        materialId: customMaterialId,
+        isCustom: true,
+        category,
+        name,
+        unit,
+        quantity,
+        unitPrice: basePrice,
+        priceOverride: undefined,
+        hasOverride: false,
+        subtotal: basePrice * quantity,
       };
       setMaterials((prev) => [...prev, newEntry]);
     },
@@ -553,6 +588,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     setLineItemMaterialOverride,
     setLineItemLaborOverride,
     addMaterial,
+    addCustomMaterial,
     updateMaterial,
     removeMaterial,
     setMaterialPriceOverride,

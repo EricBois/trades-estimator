@@ -60,6 +60,11 @@ export interface PaintingAddonPrices {
   furniture_moving?: number; // flat
 }
 
+// Preset material price overrides (material ID -> custom price)
+export interface FinishingMaterialPrices {
+  [materialId: string]: number;
+}
+
 export interface CustomRates {
   drywall_finishing?: DrywallFinishingRates;
   drywall_addons?: DrywallAddonPrices;
@@ -67,6 +72,8 @@ export interface CustomRates {
   drywall_hanging_addons?: DrywallHangingAddonPrices;
   painting?: PaintingRates;
   painting_addons?: PaintingAddonPrices;
+  // Preset material price overrides
+  finishing_material_prices?: FinishingMaterialPrices;
 }
 
 export interface UpdateProfileInput {

@@ -11,6 +11,7 @@ import {
   Package,
   CornerDownRight,
   ChevronDown,
+  Star,
 } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
 import {
@@ -19,7 +20,6 @@ import {
   FINISHING_TAPE_TYPES,
   FINISHING_CORNER_BEAD_TYPES,
   FINISHING_OTHER_MATERIALS,
-  getFinishingMaterial,
 } from "@/lib/trades/drywallFinishing/constants";
 import {
   FinishingMaterialId,
@@ -28,6 +28,7 @@ import {
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { InlineOverrideInput } from "@/components/ui/InlineOverrideInput";
+import { useContractorMaterials } from "@/hooks/useContractorMaterials";
 
 // Icon mapping for categories
 const CategoryIcon = ({
@@ -65,16 +66,26 @@ function getMaterialsByCategory(category: FinishingMaterialCategory) {
   }
 }
 
+// Map database category to finishing category
+function mapToFinishingCategory(dbCategory: string): FinishingMaterialCategory {
+  if (dbCategory === "primer") return "other";
+  return dbCategory as FinishingMaterialCategory;
+}
+
 export function DrywallMaterialsStep() {
   const { nextStep } = useWizard();
   const {
     materials,
     addMaterial,
+    addCustomMaterial,
     updateMaterial,
     removeMaterial,
     setMaterialPriceOverride,
     totals,
   } = useDrywallEstimate();
+
+  // Fetch custom materials
+  const { data: customMaterials = [] } = useContractorMaterials();
 
   // Track which category is expanded
   const [expandedCategory, setExpandedCategory] =
@@ -83,6 +94,34 @@ export function DrywallMaterialsStep() {
   const handleAddMaterial = (materialId: FinishingMaterialId) => {
     addMaterial(materialId, 1);
     setExpandedCategory(null);
+  };
+
+  const handleAddCustomMaterial = (material: {
+    id: string;
+    name: string;
+    category: string;
+    unit: string;
+    basePrice: number;
+  }) => {
+    addCustomMaterial(
+      material.id,
+      material.name,
+      mapToFinishingCategory(material.category),
+      material.unit,
+      material.basePrice,
+      1
+    );
+    setExpandedCategory(null);
+  };
+
+  // Get custom materials for a category
+  const getCustomMaterialsForCategory = (
+    category: FinishingMaterialCategory
+  ) => {
+    return customMaterials.filter((m) => {
+      const mappedCategory = mapToFinishingCategory(m.category);
+      return mappedCategory === category;
+    });
   };
 
   const handleQuantityChange = (id: string, delta: number) => {
@@ -113,9 +152,6 @@ export function DrywallMaterialsStep() {
       {materials.length > 0 && (
         <div className="space-y-3 mb-6">
           {materials.map((entry) => {
-            const materialDef = getFinishingMaterial(entry.materialId);
-            if (!materialDef) return null;
-
             return (
               <div
                 key={entry.id}
@@ -123,19 +159,30 @@ export function DrywallMaterialsStep() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                      <CategoryIcon category={entry.category} />
+                    <div
+                      className={cn(
+                        "w-10 h-10 rounded-lg flex items-center justify-center",
+                        entry.isCustom
+                          ? "bg-amber-100 text-amber-600"
+                          : "bg-blue-100 text-blue-600"
+                      )}
+                    >
+                      {entry.isCustom ? (
+                        <Star className="w-5 h-5" />
+                      ) : (
+                        <CategoryIcon category={entry.category} />
+                      )}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">
-                        {materialDef.label}
+                      <div className="font-medium text-gray-900 flex items-center gap-1.5">
+                        {entry.name}
+                        {entry.isCustom && (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                            Custom
+                          </span>
+                        )}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {"unitSize" in materialDef && materialDef.unitSize
-                          ? `${materialDef.unitSize} `
-                          : ""}
-                        {materialDef.unit}
-                      </div>
+                      <div className="text-sm text-gray-500">{entry.unit}</div>
                     </div>
                   </div>
                   <button
@@ -185,7 +232,7 @@ export function DrywallMaterialsStep() {
                           setMaterialPriceOverride(entry.id, override)
                         }
                         prefix="$"
-                        suffix={`/${materialDef.unit}`}
+                        suffix={`/${entry.unit}`}
                       />
                     </div>
                     <div className="text-lg font-semibold text-gray-900">
@@ -206,6 +253,11 @@ export function DrywallMaterialsStep() {
           const categoryMaterials = getMaterialsByCategory(
             category.id as FinishingMaterialCategory
           );
+          const categoryCustomMaterials = getCustomMaterialsForCategory(
+            category.id as FinishingMaterialCategory
+          );
+          const totalOptions =
+            categoryMaterials.length + categoryCustomMaterials.length;
 
           return (
             <div
@@ -233,7 +285,12 @@ export function DrywallMaterialsStep() {
                       {category.label}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {categoryMaterials.length} options
+                      {totalOptions} options
+                      {categoryCustomMaterials.length > 0 && (
+                        <span className="text-amber-600 ml-1">
+                          ({categoryCustomMaterials.length} custom)
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -247,6 +304,53 @@ export function DrywallMaterialsStep() {
 
               {isExpanded && (
                 <div className="border-t border-gray-200 p-3 space-y-2">
+                  {/* Custom materials first (highlighted) */}
+                  {categoryCustomMaterials.length > 0 && (
+                    <>
+                      <div className="text-xs font-medium text-amber-600 uppercase tracking-wide px-2 pb-1">
+                        Your Materials
+                      </div>
+                      {categoryCustomMaterials.map((material) => (
+                        <button
+                          key={material.id}
+                          onClick={() =>
+                            handleAddCustomMaterial({
+                              id: material.id,
+                              name: material.name,
+                              category: material.category,
+                              unit: material.unit,
+                              basePrice: material.basePrice,
+                            })
+                          }
+                          className="w-full flex items-center justify-between p-3 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors"
+                        >
+                          <div className="text-left flex items-center gap-2">
+                            <Star className="w-4 h-4 text-amber-500" />
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {material.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {material.unitSize} {material.unit}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-700">
+                              ${material.basePrice.toFixed(2)}/{material.unit}
+                            </span>
+                            <Plus className="w-5 h-5 text-amber-600" />
+                          </div>
+                        </button>
+                      ))}
+                      {categoryMaterials.length > 0 && (
+                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide px-2 pb-1 pt-2">
+                          Standard Materials
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {/* Preset materials */}
                   {categoryMaterials.map((material) => (
                     <button
                       key={material.id}
