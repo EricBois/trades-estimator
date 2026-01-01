@@ -226,8 +226,8 @@ export function useProjectEstimate(
       const t = finishingEstimate.totals;
       totals.drywall_finishing = {
         subtotal: t.subtotal,
-        materialSubtotal: 0, // Finishing is mostly labor
-        laborSubtotal: t.subtotal,
+        materialSubtotal: t.materialsSubtotal,
+        laborSubtotal: t.laborSubtotal,
         addonsSubtotal: t.addonsSubtotal,
         complexityMultiplier: t.complexityMultiplier,
         complexityAdjustment: t.complexityAdjustment,

@@ -12,7 +12,8 @@ import {
   ChevronDown,
   Star,
 } from "lucide-react";
-import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useDrywallEstimateSafe } from "./DrywallEstimateContext";
+import { UseDrywallFinishingEstimateReturn } from "@/lib/trades/drywallFinishing/types";
 import { useWizardFooter } from "../../WizardFooterContext";
 import {
   FINISHING_MATERIAL_CATEGORIES,
@@ -72,9 +73,24 @@ function mapToFinishingCategory(dbCategory: string): FinishingMaterialCategory {
   return dbCategory as FinishingMaterialCategory;
 }
 
-export function DrywallMaterialsStep() {
+export function DrywallMaterialsStep({
+  finishingEstimate,
+}: {
+  finishingEstimate?: UseDrywallFinishingEstimateReturn;
+}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
+
+  // Use prop if provided, otherwise fall back to context (backwards compatible)
+  const contextEstimate = useDrywallEstimateSafe();
+  const estimate = finishingEstimate ?? contextEstimate;
+
+  if (!estimate) {
+    throw new Error(
+      "DrywallMaterialsStep requires either finishingEstimate prop or DrywallEstimateProvider"
+    );
+  }
+
   const {
     materials,
     addMaterial,
@@ -83,7 +99,7 @@ export function DrywallMaterialsStep() {
     removeMaterial,
     setMaterialPriceOverride,
     totals,
-  } = useDrywallEstimate();
+  } = estimate;
 
   // Fetch custom materials
   const { data: customMaterials = [] } = useContractorMaterials();

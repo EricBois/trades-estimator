@@ -17,6 +17,7 @@ import { ProjectFinishingConfigStep } from "./ProjectFinishingConfigStep";
 import { ProjectPaintingConfigStep } from "./ProjectPaintingConfigStep";
 import { ProjectCombinedPreview } from "./ProjectCombinedPreview";
 import { ProjectSendEstimate } from "./ProjectSendEstimate";
+import { DrywallMaterialsStep } from "../trades/drywall/DrywallMaterialsStep";
 
 // Step type
 interface Step {
@@ -26,11 +27,11 @@ interface Step {
 // Base steps that are always present
 const BASE_STEPS: Step[] = [{ label: "Trades" }, { label: "Rooms" }];
 
-// Trade-specific step labels
-const TRADE_STEP_LABELS: Record<string, Step> = {
-  drywall_hanging: { label: "Hanging" },
-  drywall_finishing: { label: "Finishing" },
-  painting: { label: "Painting" },
+// Trade-specific step labels (arrays to support multiple steps per trade)
+const TRADE_STEP_LABELS: Record<string, Step[]> = {
+  drywall_hanging: [{ label: "Hanging" }],
+  drywall_finishing: [{ label: "Finishing" }, { label: "Materials" }],
+  painting: [{ label: "Painting" }],
 };
 
 // Final steps
@@ -70,11 +71,13 @@ function ProjectWizardWrapper({
 
 // Inner wizard that can access context
 function ProjectWizardInner() {
-  const { enabledTrades } = useProjectEstimateContext();
+  const { enabledTrades, finishingEstimate } = useProjectEstimateContext();
 
   // Build dynamic step configuration based on enabled trades
   const steps = useMemo(() => {
-    const tradeSteps = enabledTrades.map((trade) => TRADE_STEP_LABELS[trade]);
+    const tradeSteps = enabledTrades.flatMap(
+      (trade) => TRADE_STEP_LABELS[trade]
+    );
     return [...BASE_STEPS, ...tradeSteps, ...FINAL_STEPS];
   }, [enabledTrades]);
 
@@ -97,6 +100,9 @@ function ProjectWizardInner() {
           )}
           {enabledTrades.includes("drywall_finishing") && (
             <ProjectFinishingConfigStep />
+          )}
+          {enabledTrades.includes("drywall_finishing") && (
+            <DrywallMaterialsStep finishingEstimate={finishingEstimate} />
           )}
           {enabledTrades.includes("painting") && <ProjectPaintingConfigStep />}
 

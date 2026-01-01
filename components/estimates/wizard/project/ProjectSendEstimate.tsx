@@ -94,6 +94,7 @@ export function ProjectSendEstimate() {
             lineItems: finishingEstimate.lineItems,
             complexity: finishingEstimate.complexity,
             addons: finishingEstimate.addons,
+            materials: finishingEstimate.materials,
           };
         } else if (tradeType === "painting") {
           parameters = {
