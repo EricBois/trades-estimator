@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import {
   Plus,
   Trash2,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { useWizard } from "react-use-wizard";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_SHEET_TYPES,
   DRYWALL_SHEET_SIZES,
@@ -24,7 +26,6 @@ import {
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { CostSummary } from "@/components/ui/CostSummary";
 import { MaterialToggle } from "@/components/ui/MaterialToggle";
@@ -202,6 +203,7 @@ function SheetCard({
 
 export function HangingDirectEntryStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     sheets,
     addSheet,
@@ -218,6 +220,18 @@ export function HangingDirectEntryStep() {
   };
 
   const totalSheets = sheets.reduce((sum, s) => sum + s.quantity, 0);
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: sheets.length === 0 || totalSheets === 0,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, sheets.length, totalSheets]);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
@@ -270,15 +284,6 @@ export function HangingDirectEntryStep() {
           total={{ label: "Total", value: totals.subtotal }}
         />
       )}
-
-      <div className="mt-6">
-        <WizardButton
-          onClick={() => nextStep()}
-          disabled={sheets.length === 0 || totalSheets === 0}
-        >
-          Continue
-        </WizardButton>
-      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { Wizard } from "react-use-wizard";
 import { WizardNavigation } from "../../WizardNavigation";
+import { WizardFooterProvider } from "../../WizardFooterContext";
 import { createWizardWrapper, WizardOuterLayout } from "../../WizardLayout";
 import {
   HangingEstimateProvider,
@@ -70,23 +71,25 @@ function HangingWizardInner() {
       : DirectWizardWrapper;
 
   return (
-    <WizardOuterLayout>
-      <Wizard footer={<WizardNavigation />} wrapper={<WizardWrapper />}>
-        {/* Step 0: Input Mode Selection */}
-        <HangingInputModeStep />
+    <WizardFooterProvider>
+      <WizardOuterLayout>
+        <Wizard footer={<WizardNavigation />} wrapper={<WizardWrapper />}>
+          {/* Step 0: Input Mode Selection */}
+          <HangingInputModeStep />
 
-        {/* Steps 1-2 vary by mode */}
-        {inputMode === "calculator" && <HangingRoomStep />}
-        {inputMode === "calculator" && <HangingSheetTypeStep />}
-        {inputMode === "direct" && <HangingDirectEntryStep />}
-        {inputMode === "labor_only" && <HangingLaborOnlyStep />}
-        {/* Common steps */}
-        <HangingAddonsStep />
-        <HangingComplexityStep />
-        <HangingPreview />
-        <HangingSendEstimate />
-      </Wizard>
-    </WizardOuterLayout>
+          {/* Steps 1-2 vary by mode */}
+          {inputMode === "calculator" && <HangingRoomStep />}
+          {inputMode === "calculator" && <HangingSheetTypeStep />}
+          {inputMode === "direct" && <HangingDirectEntryStep />}
+          {inputMode === "labor_only" && <HangingLaborOnlyStep />}
+          {/* Common steps */}
+          <HangingAddonsStep />
+          <HangingComplexityStep />
+          <HangingPreview />
+          <HangingSendEstimate />
+        </Wizard>
+      </WizardOuterLayout>
+    </WizardFooterProvider>
   );
 }
 

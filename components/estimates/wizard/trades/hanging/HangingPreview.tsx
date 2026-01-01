@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_SHEET_TYPES,
   DRYWALL_SHEET_SIZES,
@@ -11,11 +13,11 @@ import {
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 import { EditButton } from "@/components/ui/EditButton";
 
 export function HangingPreview() {
   const { nextStep, goToStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     inputMode,
     rooms,
@@ -28,6 +30,17 @@ export function HangingPreview() {
     directSqft,
     defaultRates,
   } = useHangingEstimate();
+
+  // Configure footer with "Send to Homeowner" button
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Send to Homeowner",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   // Calculate step indices for edit navigation based on mode
   // Calculator: 0=Mode, 1=Rooms, 2=SheetType, 3=Addons, 4=Complexity, 5=Preview
@@ -260,12 +273,6 @@ export function HangingPreview() {
             </span>
           </div>
         </div>
-      </div>
-
-      <div className="mt-6">
-        <WizardButton onClick={() => nextStep()}>
-          Send to Homeowner
-        </WizardButton>
       </div>
     </div>
   );

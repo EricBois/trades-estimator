@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Clock, FileText, Loader2, DollarSign } from "lucide-react";
 import { useWizardData } from "./WizardDataContext";
+import { useWizardFooter } from "./WizardFooterContext";
 import { useTemplates } from "@/hooks/useTemplates";
 import { DEFAULT_WIZARD_TEMPLATES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,10 @@ interface WizardTemplate {
   isDefault?: boolean;
 }
 
-const PRICING_TYPE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+const PRICING_TYPE_STYLES: Record<
+  string,
+  { bg: string; text: string; label: string }
+> = {
   hourly: { bg: "bg-green-100", text: "text-green-700", label: "Hourly" },
   contract: { bg: "bg-blue-100", text: "text-blue-700", label: "Contract" },
   hybrid: { bg: "bg-purple-100", text: "text-purple-700", label: "Hybrid" },
@@ -30,36 +34,54 @@ const PRICING_TYPE_STYLES: Record<string, { bg: string; text: string; label: str
 
 export function TemplateStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { tradeType, setTemplate } = useWizardData();
   const { data: userTemplates, isLoading } = useTemplates();
+
+  // Configure footer (Continue is disabled since user must select a template)
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: true, // Selecting a template auto-navigates
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   // Combine user templates with default templates for the selected trade
   const availableTemplates = useMemo(() => {
     const templates: WizardTemplate[] = [];
 
     // Add user's templates for this trade
-    const userTradeTemplates = userTemplates?.filter(
-      (t) => t.tradeType === tradeType
-    ) ?? [];
+    const userTradeTemplates =
+      userTemplates?.filter((t) => t.tradeType === tradeType) ?? [];
 
-    templates.push(...userTradeTemplates.map(t => ({
-      ...t,
-      pricingType: "contract", // Default pricing type for existing templates
-      isDefault: false,
-    })));
+    templates.push(
+      ...userTradeTemplates.map((t) => ({
+        ...t,
+        pricingType: "contract", // Default pricing type for existing templates
+        isDefault: false,
+      }))
+    );
 
     // Add default templates for this trade (if user has none)
     if (userTradeTemplates.length === 0) {
       const defaultTradeTemplates = DEFAULT_WIZARD_TEMPLATES.filter(
         (t) => t.tradeType === tradeType
       );
-      templates.push(...defaultTradeTemplates.map(t => ({
-        ...t,
-        description: t.description,
-        complexityMultipliers: ("complexityMultipliers" in t ? t.complexityMultipliers : null) as Record<string, number> | null,
-        requiredFields: t.requiredFields as Record<string, unknown>,
-        isDefault: true,
-      })));
+      templates.push(
+        ...defaultTradeTemplates.map((t) => ({
+          ...t,
+          description: t.description,
+          complexityMultipliers: ("complexityMultipliers" in t
+            ? t.complexityMultipliers
+            : null) as Record<string, number> | null,
+          requiredFields: t.requiredFields as Record<string, unknown>,
+          isDefault: true,
+        }))
+      );
     }
 
     return templates;
@@ -108,7 +130,8 @@ export function TemplateStep() {
       ) : (
         <div className="space-y-3">
           {availableTemplates.map((template) => {
-            const pricingStyle = PRICING_TYPE_STYLES[template.pricingType ?? "contract"];
+            const pricingStyle =
+              PRICING_TYPE_STYLES[template.pricingType ?? "contract"];
 
             return (
               <button
@@ -123,10 +146,14 @@ export function TemplateStep() {
                   "text-left"
                 )}
               >
-                <div className={cn(
-                  "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
-                  template.pricingType === "hourly" ? "bg-green-100" : "bg-blue-100"
-                )}>
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                    template.pricingType === "hourly"
+                      ? "bg-green-100"
+                      : "bg-blue-100"
+                  )}
+                >
                   {template.pricingType === "hourly" ? (
                     <Clock className="w-5 h-5 text-green-600" />
                   ) : (
@@ -138,11 +165,13 @@ export function TemplateStep() {
                     <h3 className="text-lg font-medium text-gray-900">
                       {template.templateName}
                     </h3>
-                    <span className={cn(
-                      "text-xs font-medium px-2 py-0.5 rounded-full",
-                      pricingStyle.bg,
-                      pricingStyle.text
-                    )}>
+                    <span
+                      className={cn(
+                        "text-xs font-medium px-2 py-0.5 rounded-full",
+                        pricingStyle.bg,
+                        pricingStyle.text
+                      )}
+                    >
                       {pricingStyle.label}
                     </span>
                     {template.isDefault && (

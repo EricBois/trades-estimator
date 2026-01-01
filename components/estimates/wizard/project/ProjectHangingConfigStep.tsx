@@ -1,21 +1,32 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { cn } from "@/lib/utils";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
+import { useWizardFooter } from "../WizardFooterContext";
 import {
   DRYWALL_SHEET_TYPES,
   CEILING_HEIGHT_FACTORS,
   HANGING_ADDONS,
 } from "@/lib/trades/drywallHanging/constants";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 export function ProjectHangingConfigStep() {
   const { nextStep } = useWizard();
-  const { hangingEstimate, getTradeRoomViews, roomsHook } =
-    useProjectEstimateContext();
+  const { setFooterConfig } = useWizardFooter();
+  const { hangingEstimate, roomsHook } = useProjectEstimateContext();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   const {
     sheets,
@@ -208,12 +219,6 @@ export function ProjectHangingConfigStep() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <WizardButton onClick={nextStep} className="w-full max-w-lg mx-auto">
-          Continue
-        </WizardButton>
       </div>
     </div>
   );

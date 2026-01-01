@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Plus, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
+import { useWizardFooter } from "../WizardFooterContext";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 import { RoomCard } from "./RoomCard";
 
 export function ProjectRoomsStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { roomsHook } = useProjectEstimateContext();
   const {
     rooms,
@@ -40,6 +41,18 @@ export function ProjectRoomsStep() {
     inputMode === "rooms"
       ? rooms.length > 0 && totalSqft > 0
       : totalWallSqft > 0 || totalCeilingSqft > 0;
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: !canContinue,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, canContinue]);
 
   return (
     <div className="flex flex-col h-full">
@@ -199,16 +212,6 @@ export function ProjectRoomsStep() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <WizardButton
-          onClick={nextStep}
-          disabled={!canContinue}
-          className="w-full max-w-lg mx-auto"
-        >
-          Continue
-        </WizardButton>
       </div>
     </div>
   );

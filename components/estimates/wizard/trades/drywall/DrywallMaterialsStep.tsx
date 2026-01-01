@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import {
-  ChevronRight,
   Plus,
   Minus,
   Trash2,
@@ -14,6 +13,7 @@ import {
   Star,
 } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   FINISHING_MATERIAL_CATEGORIES,
   FINISHING_MUD_TYPES,
@@ -74,6 +74,7 @@ function mapToFinishingCategory(dbCategory: string): FinishingMaterialCategory {
 
 export function DrywallMaterialsStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     materials,
     addMaterial,
@@ -90,6 +91,17 @@ export function DrywallMaterialsStep() {
   // Track which category is expanded
   const [expandedCategory, setExpandedCategory] =
     useState<FinishingMaterialCategory | null>(null);
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: materials.length === 0 ? "Skip" : "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, materials.length]);
 
   const handleAddMaterial = (materialId: FinishingMaterialId) => {
     addMaterial(materialId, 1);
@@ -133,10 +145,6 @@ export function DrywallMaterialsStep() {
       return;
     }
     updateMaterial(id, { quantity: newQty });
-  };
-
-  const handleContinue = () => {
-    nextStep();
   };
 
   return (
@@ -382,30 +390,15 @@ export function DrywallMaterialsStep() {
         })}
       </div>
 
-      {/* Continue */}
-      <div className="mt-6 space-y-3">
-        {materials.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
-            <span className="text-sm text-blue-600">Materials: </span>
-            <span className="text-lg font-bold text-blue-900">
-              +${formatCurrency(totals.materialsSubtotal)}
-            </span>
-          </div>
-        )}
-        <button
-          onClick={handleContinue}
-          className={cn(
-            "w-full flex items-center justify-center gap-2",
-            "min-h-15 px-6",
-            "bg-blue-600 text-white rounded-xl",
-            "hover:bg-blue-700 active:scale-[0.98]",
-            "transition-all font-medium text-lg"
-          )}
-        >
-          {materials.length === 0 ? "Skip" : "Continue"}
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Materials Summary */}
+      {materials.length > 0 && (
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+          <span className="text-sm text-blue-600">Materials: </span>
+          <span className="text-lg font-bold text-blue-900">
+            +${formatCurrency(totals.materialsSubtotal)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

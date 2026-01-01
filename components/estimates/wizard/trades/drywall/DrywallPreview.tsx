@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { Calculator, Edit2, ChevronRight, Layers } from "lucide-react";
+import { Calculator, Edit2, Layers, Send } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_FINISH_LEVELS,
   DRYWALL_LINE_ITEM_TYPES,
@@ -16,8 +18,20 @@ import { cn } from "@/lib/utils";
 
 export function DrywallPreview() {
   const { nextStep, goToStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { finishLevel, lineItems, addons, materials, complexity, totals } =
     useDrywallEstimate();
+
+  // Configure footer with "Send to Homeowner" button
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Send to Homeowner",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   // Get display values
   const finishLevelLabel =
@@ -239,7 +253,7 @@ export function DrywallPreview() {
       </div>
 
       {/* Total Breakdown */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-6">
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Line Items</span>
@@ -280,21 +294,6 @@ export function DrywallPreview() {
           </div>
         </div>
       </div>
-
-      {/* Continue Button */}
-      <button
-        onClick={nextStep}
-        className={cn(
-          "w-full flex items-center justify-center gap-2",
-          "min-h-[60px] px-6",
-          "bg-blue-600 text-white rounded-xl",
-          "hover:bg-blue-700 active:scale-[0.98]",
-          "transition-all font-medium text-lg cursor-pointer"
-        )}
-      >
-        Send to Homeowner
-        <ChevronRight className="w-5 h-5" />
-      </button>
     </div>
   );
 }

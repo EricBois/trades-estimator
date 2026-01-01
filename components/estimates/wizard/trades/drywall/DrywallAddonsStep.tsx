@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { Check, ChevronRight, Plus, Minus } from "lucide-react";
+import { Check, Plus, Minus } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { DRYWALL_ADDONS } from "@/lib/trades/drywallFinishing/constants";
 import { DrywallAddonId } from "@/lib/trades/drywallFinishing/types";
 import { DrywallAddonPrices } from "@/hooks/useProfile";
@@ -11,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 export function DrywallAddonsStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     addons,
     toggleAddon,
@@ -19,6 +22,17 @@ export function DrywallAddonsStep() {
     lineItems,
     defaultAddonPrices,
   } = useDrywallEstimate();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: addons.length === 0 ? "Skip" : "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, addons.length]);
 
   // Helper to get the user's price for an add-on
   const getAddonPrice = (addonId: string): number => {
@@ -59,10 +73,6 @@ export function DrywallAddonsStep() {
     updateAddonQuantity(addonId, newQty);
   };
 
-  const handleContinue = () => {
-    nextStep();
-  };
-
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
       <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
@@ -76,7 +86,8 @@ export function DrywallAddonsStep() {
         {DRYWALL_ADDONS.map((addon) => {
           const isSelected = isAddonSelected(addon.id as DrywallAddonId);
           const quantity = getAddonQuantity(addon.id as DrywallAddonId);
-          const showQuantity = isSelected && (addon.unit === "sqft" || addon.unit === "each");
+          const showQuantity =
+            isSelected && (addon.unit === "sqft" || addon.unit === "each");
 
           return (
             <div
@@ -103,7 +114,9 @@ export function DrywallAddonsStep() {
                     {isSelected && <Check className="w-4 h-4 text-white" />}
                   </div>
                   <div className="text-left">
-                    <div className="font-medium text-gray-900">{addon.label}</div>
+                    <div className="font-medium text-gray-900">
+                      {addon.label}
+                    </div>
                     <div className="text-sm text-gray-500">
                       ${getAddonPrice(addon.id).toFixed(2)}
                       {addon.unit !== "flat" && `/${addon.unit}`}
@@ -117,7 +130,12 @@ export function DrywallAddonsStep() {
                 <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => handleQuantityChange(addon.id as DrywallAddonId, addon.unit === "sqft" ? -10 : -1)}
+                      onClick={() =>
+                        handleQuantityChange(
+                          addon.id as DrywallAddonId,
+                          addon.unit === "sqft" ? -10 : -1
+                        )
+                      }
                       className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
                     >
                       <Minus className="w-5 h-5 text-gray-600" />
@@ -129,7 +147,10 @@ export function DrywallAddonsStep() {
                         onChange={(e) => {
                           const val = parseInt(e.target.value, 10);
                           if (!isNaN(val) && val > 0) {
-                            updateAddonQuantity(addon.id as DrywallAddonId, val);
+                            updateAddonQuantity(
+                              addon.id as DrywallAddonId,
+                              val
+                            );
                           }
                         }}
                         className="w-20 sm:w-24 text-center text-lg font-semibold text-gray-900 border-2 border-gray-200 rounded-xl py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -141,7 +162,12 @@ export function DrywallAddonsStep() {
                       </span>
                     </div>
                     <button
-                      onClick={() => handleQuantityChange(addon.id as DrywallAddonId, addon.unit === "sqft" ? 10 : 1)}
+                      onClick={() =>
+                        handleQuantityChange(
+                          addon.id as DrywallAddonId,
+                          addon.unit === "sqft" ? 10 : 1
+                        )
+                      }
                       className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
                     >
                       <Plus className="w-5 h-5 text-blue-600" />
@@ -159,30 +185,15 @@ export function DrywallAddonsStep() {
         })}
       </div>
 
-      {/* Continue */}
-      <div className="mt-6 space-y-3">
-        {addons.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
-            <span className="text-sm text-blue-600">Add-ons: </span>
-            <span className="text-lg font-bold text-blue-900">
-              +${formatCurrency(totals.addonsSubtotal)}
-            </span>
-          </div>
-        )}
-        <button
-          onClick={handleContinue}
-          className={cn(
-            "w-full flex items-center justify-center gap-2",
-            "min-h-[60px] px-6",
-            "bg-blue-600 text-white rounded-xl",
-            "hover:bg-blue-700 active:scale-[0.98]",
-            "transition-all font-medium text-lg"
-          )}
-        >
-          {addons.length === 0 ? "Skip" : "Continue"}
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Add-ons Summary */}
+      {addons.length > 0 && (
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+          <span className="text-sm text-blue-600">Add-ons: </span>
+          <span className="text-lg font-bold text-blue-900">
+            +${formatCurrency(totals.addonsSubtotal)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

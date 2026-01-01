@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Wizard, useWizard } from "react-use-wizard";
 import { WizardNavigation } from "../WizardNavigation";
+import { WizardFooterProvider } from "../WizardFooterContext";
 import { WizardOuterLayout } from "../WizardLayout";
 import { WizardStepper } from "@/components/ui/WizardStepper";
 import {
@@ -78,31 +79,33 @@ function ProjectWizardInner() {
   }, [enabledTrades]);
 
   return (
-    <WizardOuterLayout>
-      <Wizard
-        footer={<WizardNavigation />}
-        wrapper={<ProjectWizardWrapper steps={steps} />}
-      >
-        {/* Step 0: Trade Selection */}
-        <ProjectTradeSelectionStep />
+    <WizardFooterProvider>
+      <WizardOuterLayout>
+        <Wizard
+          footer={<WizardNavigation />}
+          wrapper={<ProjectWizardWrapper steps={steps} />}
+        >
+          {/* Step 0: Trade Selection */}
+          <ProjectTradeSelectionStep />
 
-        {/* Step 1: Rooms */}
-        <ProjectRoomsStep />
+          {/* Step 1: Rooms */}
+          <ProjectRoomsStep />
 
-        {/* Dynamic trade config steps */}
-        {enabledTrades.includes("drywall_hanging") && (
-          <ProjectHangingConfigStep />
-        )}
-        {enabledTrades.includes("drywall_finishing") && (
-          <ProjectFinishingConfigStep />
-        )}
-        {enabledTrades.includes("painting") && <ProjectPaintingConfigStep />}
+          {/* Dynamic trade config steps */}
+          {enabledTrades.includes("drywall_hanging") && (
+            <ProjectHangingConfigStep />
+          )}
+          {enabledTrades.includes("drywall_finishing") && (
+            <ProjectFinishingConfigStep />
+          )}
+          {enabledTrades.includes("painting") && <ProjectPaintingConfigStep />}
 
-        {/* Final steps */}
-        <ProjectCombinedPreview />
-        <ProjectSendEstimate />
-      </Wizard>
-    </WizardOuterLayout>
+          {/* Final steps */}
+          <ProjectCombinedPreview />
+          <ProjectSendEstimate />
+        </Wizard>
+      </WizardOuterLayout>
+    </WizardFooterProvider>
   );
 }
 

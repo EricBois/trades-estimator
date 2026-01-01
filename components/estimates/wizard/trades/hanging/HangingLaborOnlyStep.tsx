@@ -1,15 +1,33 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { ChevronRight, Minus, Plus, Hammer } from "lucide-react";
+import { Minus, Plus, Hammer } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 
 export function HangingLaborOnlyStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { directSqft, setDirectSqft, totals, defaultRates } =
     useHangingEstimate();
+
+  const canContinue = directSqft > 0;
+  const laborRate = defaultRates.labor_per_sqft ?? 0.35;
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: !canContinue,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, canContinue]);
 
   const handleSqftChange = (value: number) => {
     if (value >= 0) {
@@ -27,13 +45,6 @@ export function HangingLaborOnlyStep() {
       setDirectSqft(newValue);
     }
   };
-
-  const handleContinue = () => {
-    nextStep();
-  };
-
-  const canContinue = directSqft > 0;
-  const laborRate = defaultRates.labor_per_sqft ?? 0.35;
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
@@ -118,7 +129,7 @@ export function HangingLaborOnlyStep() {
 
       {/* Estimate preview */}
       {directSqft > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-blue-700">Labor Estimate</span>
             <span className="text-2xl font-bold text-blue-900">
@@ -130,23 +141,6 @@ export function HangingLaborOnlyStep() {
           </p>
         </div>
       )}
-
-      {/* Continue button */}
-      <button
-        onClick={handleContinue}
-        disabled={!canContinue}
-        className={cn(
-          "w-full flex items-center justify-center gap-2",
-          "min-h-[60px] px-6",
-          "rounded-xl transition-all font-medium text-lg",
-          canContinue
-            ? "bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98]"
-            : "bg-gray-200 text-gray-400 cursor-not-allowed"
-        )}
-      >
-        Continue
-        <ChevronRight className="w-5 h-5" />
-      </button>
     </div>
   );
 }

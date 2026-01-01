@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { Check, ChevronRight, Plus, Minus } from "lucide-react";
+import { Check, Plus, Minus } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { HANGING_ADDONS } from "@/lib/trades/drywallHanging/constants";
 import { HangingAddonId } from "@/lib/trades/drywallHanging/types";
 import { formatCurrency } from "@/lib/estimateCalculations";
@@ -10,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 export function HangingAddonsStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     addons,
     toggleAddon,
@@ -17,6 +20,17 @@ export function HangingAddonsStep() {
     totals,
     defaultAddonPrices,
   } = useHangingEstimate();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: addons.length === 0 ? "Skip" : "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, addons.length]);
 
   // Helper to get the user's price for an add-on
   const getAddonPrice = (addonId: string): number => {
@@ -54,10 +68,6 @@ export function HangingAddonsStep() {
     const newQty = currentQty + delta;
     if (newQty <= 0) return;
     updateAddonQuantity(addonId, newQty);
-  };
-
-  const handleContinue = () => {
-    nextStep();
   };
 
   return (
@@ -172,30 +182,15 @@ export function HangingAddonsStep() {
         })}
       </div>
 
-      {/* Continue */}
-      <div className="mt-6 space-y-3">
-        {addons.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
-            <span className="text-sm text-blue-600">Add-ons: </span>
-            <span className="text-lg font-bold text-blue-900">
-              +${formatCurrency(totals.addonsSubtotal)}
-            </span>
-          </div>
-        )}
-        <button
-          onClick={handleContinue}
-          className={cn(
-            "w-full flex items-center justify-center gap-2",
-            "min-h-15 px-6",
-            "bg-blue-600 text-white rounded-xl",
-            "hover:bg-blue-700 active:scale-[0.98]",
-            "transition-all font-medium text-lg"
-          )}
-        >
-          {addons.length === 0 ? "Skip" : "Continue"}
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Add-ons Summary */}
+      {addons.length > 0 && (
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+          <span className="text-sm text-blue-600">Add-ons: </span>
+          <span className="text-lg font-bold text-blue-900">
+            +${formatCurrency(totals.addonsSubtotal)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { Wizard } from "react-use-wizard";
 import { WizardNavigation } from "../../WizardNavigation";
+import { WizardFooterProvider } from "../../WizardFooterContext";
 import { createWizardWrapper, WizardOuterLayout } from "../../WizardLayout";
 import { DrywallEstimateProvider } from "./DrywallEstimateContext";
 import { DrywallFinishLevelStep } from "./DrywallFinishLevelStep";
@@ -29,20 +30,22 @@ const DrywallWizardWrapper = createWizardWrapper(DRYWALL_STEPS);
 export function DrywallEstimateWizard() {
   return (
     <DrywallEstimateProvider>
-      <WizardOuterLayout>
-        <Wizard
-          footer={<WizardNavigation />}
-          wrapper={<DrywallWizardWrapper />}
-        >
-          <DrywallFinishLevelStep />
-          <DrywallLineItemsStep />
-          <DrywallAddonsStep />
-          <DrywallMaterialsStep />
-          <DrywallComplexityStep />
-          <DrywallPreview />
-          <DrywallSendEstimate />
-        </Wizard>
-      </WizardOuterLayout>
+      <WizardFooterProvider>
+        <WizardOuterLayout>
+          <Wizard
+            footer={<WizardNavigation />}
+            wrapper={<DrywallWizardWrapper />}
+          >
+            <DrywallFinishLevelStep />
+            <DrywallLineItemsStep />
+            <DrywallAddonsStep />
+            <DrywallMaterialsStep />
+            <DrywallComplexityStep />
+            <DrywallPreview />
+            <DrywallSendEstimate />
+          </Wizard>
+        </WizardOuterLayout>
+      </WizardFooterProvider>
     </DrywallEstimateProvider>
   );
 }

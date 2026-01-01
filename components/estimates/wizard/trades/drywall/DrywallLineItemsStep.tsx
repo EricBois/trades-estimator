@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import {
   Plus,
@@ -10,10 +10,10 @@ import {
   Square,
   Sparkles,
   CornerDownRight,
-  ChevronRight,
   X,
 } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_LINE_ITEM_TYPES,
   DRYWALL_MATERIAL_LABOR_RATES,
@@ -40,6 +40,7 @@ function getIcon(iconName: string) {
 
 export function DrywallLineItemsStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     lineItems,
     addLineItem,
@@ -52,6 +53,18 @@ export function DrywallLineItemsStep() {
     setLineItemMaterialOverride,
     setLineItemLaborOverride,
   } = useDrywallEstimate();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: lineItems.length === 0,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, lineItems.length]);
 
   // Get the default rate for a line item type
   const getDefaultRate = (type: DrywallLineItemType): number | null => {
@@ -74,10 +87,6 @@ export function DrywallLineItemsStep() {
     const newQty = item.quantity + delta;
     if (newQty < 0) return;
     updateLineItem(id, { quantity: newQty });
-  };
-
-  const handleContinue = () => {
-    nextStep();
   };
 
   return (
@@ -364,42 +373,25 @@ export function DrywallLineItemsStep() {
         </div>
       )}
 
-      {/* Running Total & Continue */}
-      <div className="mt-6 space-y-3">
-        {lineItems.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-4">
-            <div className="flex justify-between text-sm text-blue-600 mb-1">
-              <span>Materials</span>
-              <span>${formatCurrency(totals.materialSubtotal)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-blue-600 mb-2">
-              <span>Labor</span>
-              <span>${formatCurrency(totals.laborSubtotal)}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t border-blue-200">
-              <span className="text-sm text-blue-600">Subtotal</span>
-              <span className="text-xl font-bold text-blue-900">
-                ${formatCurrency(totals.lineItemsSubtotal)}
-              </span>
-            </div>
+      {/* Running Total Summary */}
+      {lineItems.length > 0 && (
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-4">
+          <div className="flex justify-between text-sm text-blue-600 mb-1">
+            <span>Materials</span>
+            <span>${formatCurrency(totals.materialSubtotal)}</span>
           </div>
-        )}
-        <button
-          onClick={handleContinue}
-          disabled={lineItems.length === 0}
-          className={cn(
-            "w-full flex items-center justify-center gap-2",
-            "min-h-15 px-6",
-            "bg-blue-600 text-white rounded-xl",
-            "hover:bg-blue-700 active:scale-[0.98]",
-            "transition-all font-medium text-lg",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
-          )}
-        >
-          Continue
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+          <div className="flex justify-between text-sm text-blue-600 mb-2">
+            <span>Labor</span>
+            <span>${formatCurrency(totals.laborSubtotal)}</span>
+          </div>
+          <div className="flex justify-between pt-2 border-t border-blue-200">
+            <span className="text-sm text-blue-600">Subtotal</span>
+            <span className="text-xl font-bold text-blue-900">
+              ${formatCurrency(totals.lineItemsSubtotal)}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

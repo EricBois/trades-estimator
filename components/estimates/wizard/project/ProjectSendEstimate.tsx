@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Phone, User, FileText, Loader2 } from "lucide-react";
+import { Mail, Phone, User, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
+import { useWizardFooter } from "../WizardFooterContext";
 import { useCreateProject, useCreateEstimate } from "@/hooks";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -22,6 +22,7 @@ function formatCurrency(value: number): string {
 export function ProjectSendEstimate() {
   const router = useRouter();
   const { user } = useAuth();
+  const { setFooterConfig } = useWizardFooter();
   const {
     projectName,
     setProjectName,
@@ -50,7 +51,7 @@ export function ProjectSendEstimate() {
   const canSubmit =
     homeownerName.trim() !== "" && homeownerEmail.trim() !== "" && isEmailValid;
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!user || !canSubmit) return;
 
     setIsSubmitting(true);
@@ -128,7 +129,45 @@ export function ProjectSendEstimate() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [
+    user,
+    canSubmit,
+    createProject,
+    projectName,
+    homeownerName,
+    homeownerEmail,
+    homeownerPhone,
+    notes,
+    roomsHook,
+    enabledTrades,
+    tradeTotals,
+    hangingEstimate,
+    finishingEstimate,
+    paintingEstimate,
+    createEstimate,
+    router,
+  ]);
+
+  // Use ref to avoid useEffect dependency on handleSubmit
+  const handleSubmitRef = useRef(handleSubmit);
+
+  // Update ref in an effect to satisfy linter
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  });
+
+  // Configure footer with send button
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: () => handleSubmitRef.current(),
+      continueText: "Send Estimate",
+      icon: "send",
+      isLoading: isSubmitting,
+      loadingText: "Sending...",
+      disabled: !canSubmit,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, isSubmitting, canSubmit]);
 
   return (
     <div className="flex flex-col h-full">
@@ -257,23 +296,6 @@ export function ProjectSendEstimate() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <WizardButton
-          onClick={handleSubmit}
-          disabled={!canSubmit || isSubmitting}
-          className="w-full max-w-lg mx-auto"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Sending...
-            </>
-          ) : (
-            "Send Estimate"
-          )}
-        </WizardButton>
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { ChevronRight } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   HANGING_COMPLEXITY_MULTIPLIERS,
   CEILING_HEIGHT_FACTORS,
@@ -42,8 +43,20 @@ const COMPLEXITY_OPTIONS: {
 
 export function HangingComplexityStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { complexity, setComplexity, ceilingFactor, setCeilingFactor, totals } =
     useHangingEstimate();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   const handleComplexitySelect = (value: HangingComplexity) => {
     setComplexity(value);
@@ -51,10 +64,6 @@ export function HangingComplexityStep() {
 
   const handleCeilingFactorSelect = (value: CeilingHeightFactor) => {
     setCeilingFactor(value);
-  };
-
-  const handleContinue = () => {
-    nextStep();
   };
 
   return (
@@ -164,7 +173,7 @@ export function HangingComplexityStep() {
       </div>
 
       {/* Cost Impact Preview */}
-      <div className="bg-gray-50 rounded-xl p-4 mb-6">
+      <div className="bg-gray-50 rounded-xl p-4">
         <div className="flex justify-between items-center mb-2">
           <span className="text-gray-600">Base Cost</span>
           <span className="font-medium text-gray-900">
@@ -199,21 +208,6 @@ export function HangingComplexityStep() {
           </div>
         </div>
       </div>
-
-      {/* Continue button */}
-      <button
-        onClick={handleContinue}
-        className={cn(
-          "w-full flex items-center justify-center gap-2",
-          "min-h-15 px-6",
-          "bg-blue-600 text-white rounded-xl",
-          "hover:bg-blue-700 active:scale-[0.98]",
-          "transition-all font-medium text-lg"
-        )}
-      >
-        Continue
-        <ChevronRight className="w-5 h-5" />
-      </button>
     </div>
   );
 }

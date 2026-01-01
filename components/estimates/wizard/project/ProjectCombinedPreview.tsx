@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import {
   Hammer,
@@ -8,12 +9,11 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
+import { useWizardFooter } from "../WizardFooterContext";
 import { ProjectTradeType, getTradeDisplayInfo } from "@/lib/project/types";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 // Icon mapping
 const TRADE_ICONS = {
@@ -137,12 +137,24 @@ function TradeBreakdown({
 
 export function ProjectCombinedPreview() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { enabledTrades, projectTotals, roomsHook } =
     useProjectEstimateContext();
 
   const [expandedTrade, setExpandedTrade] = useState<ProjectTradeType | null>(
     null
   );
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue to Send",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   return (
     <div className="flex flex-col h-full">
@@ -222,12 +234,6 @@ export function ProjectCombinedPreview() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <WizardButton onClick={nextStep} className="w-full max-w-lg mx-auto">
-          Continue to Send
-        </WizardButton>
       </div>
     </div>
   );

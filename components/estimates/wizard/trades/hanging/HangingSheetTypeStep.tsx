@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import {
   Square,
@@ -12,6 +12,7 @@ import {
   Check,
 } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_SHEET_TYPES,
   DRYWALL_SHEET_SIZES,
@@ -24,7 +25,6 @@ import {
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { SelectionPillGroup } from "@/components/ui/SelectionPill";
 import { CostSummary } from "@/components/ui/CostSummary";
@@ -41,6 +41,7 @@ const ICONS: Record<string, React.ElementType> = {
 
 export function HangingSheetTypeStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     rooms,
     sheets,
@@ -59,6 +60,20 @@ export function HangingSheetTypeStep() {
       calculateSheetsFromRooms();
     }
   }, [sheets.length, rooms.length, calculateSheetsFromRooms]);
+
+  const hasSelection = sheets.length > 0 && totals.sheetsNeeded > 0;
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: !hasSelection,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, hasSelection]);
 
   const totalSqft = rooms.reduce((sum, room) => sum + room.totalSqft, 0);
   const currentSize: DrywallSheetSize = sheets[0]?.size ?? "4x8";
@@ -111,8 +126,6 @@ export function HangingSheetTypeStep() {
       updateSheet(sheet.id, { size });
     });
   };
-
-  const hasSelection = sheets.length > 0 && totals.sheetsNeeded > 0;
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
@@ -324,10 +337,6 @@ export function HangingSheetTypeStep() {
           total={{ label: "Total", value: totals.subtotal }}
         />
       )}
-
-      <WizardButton onClick={() => nextStep()} disabled={!hasSelection}>
-        Continue
-      </WizardButton>
     </div>
   );
 }

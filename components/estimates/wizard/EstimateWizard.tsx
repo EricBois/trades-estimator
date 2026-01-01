@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Wizard } from "react-use-wizard";
 import { WizardDataProvider, useWizardData } from "./WizardDataContext";
 import { WizardNavigation } from "./WizardNavigation";
+import { WizardFooterProvider } from "./WizardFooterContext";
 import { createWizardWrapper, WizardOuterLayout } from "./WizardLayout";
 import { TemplateStep } from "./TemplateStep";
 import { QuantityStep } from "./QuantityStep";
@@ -40,15 +41,20 @@ function WizardContent({ initialTrade }: EstimateWizardProps) {
   }, [initialTrade, updateData]);
 
   return (
-    <WizardOuterLayout>
-      <Wizard footer={<WizardNavigation />} wrapper={<StandardWizardWrapper />}>
-        <TemplateStep />
-        <QuantityStep />
-        <ComplexityStep />
-        <EstimatePreview />
-        <SendEstimate />
-      </Wizard>
-    </WizardOuterLayout>
+    <WizardFooterProvider>
+      <WizardOuterLayout>
+        <Wizard
+          footer={<WizardNavigation />}
+          wrapper={<StandardWizardWrapper />}
+        >
+          <TemplateStep />
+          <QuantityStep />
+          <ComplexityStep />
+          <EstimatePreview />
+          <SendEstimate />
+        </Wizard>
+      </WizardOuterLayout>
+    </WizardFooterProvider>
   );
 }
 

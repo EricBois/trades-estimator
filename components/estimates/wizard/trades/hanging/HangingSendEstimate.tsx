@@ -1,20 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Send } from "lucide-react";
 import { z } from "zod";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { useCreateEstimate } from "@/hooks/useEstimates";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 export function HangingSendEstimate() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { setFooterConfig } = useWizardFooter();
   const {
     rooms,
     sheets,
@@ -33,7 +33,7 @@ export function HangingSendEstimate() {
   const [projectDescription, setProjectDescription] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validate = () => {
+  const validate = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
     if (!homeownerName.trim()) {
@@ -41,15 +41,15 @@ export function HangingSendEstimate() {
     }
     if (!homeownerEmail.trim()) {
       newErrors.homeownerEmail = "Email is required";
-    } else if (!z.email().safeParse(homeownerEmail).success) {
+    } else if (!z.string().email().safeParse(homeownerEmail).success) {
       newErrors.homeownerEmail = "Please enter a valid email";
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [homeownerName, homeownerEmail]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!validate() || !profile) return;
 
     try {
@@ -125,7 +125,44 @@ export function HangingSendEstimate() {
           error instanceof Error ? error.message : "Failed to create estimate",
       });
     }
-  };
+  }, [
+    validate,
+    profile,
+    inputMode,
+    rooms,
+    sheets,
+    addons,
+    complexity,
+    ceilingFactor,
+    wasteFactor,
+    totals,
+    createEstimate,
+    homeownerName,
+    homeownerEmail,
+    homeownerPhone,
+    projectDescription,
+    router,
+  ]);
+
+  // Use ref to avoid useEffect dependency on handleSubmit
+  const handleSubmitRef = useRef(handleSubmit);
+
+  // Update ref in an effect to satisfy linter
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  });
+
+  // Configure footer with send button
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: () => handleSubmitRef.current(),
+      continueText: "Send Estimate",
+      icon: "send",
+      isLoading: createEstimate.isPending,
+      loadingText: "Creating...",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, createEstimate.isPending]);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
@@ -227,17 +264,6 @@ export function HangingSendEstimate() {
             <p className="text-red-600 text-sm">{errors.submit}</p>
           </div>
         )}
-      </div>
-
-      <div className="mt-6">
-        <WizardButton
-          onClick={handleSubmit}
-          disabled={createEstimate.isPending}
-          loading={createEstimate.isPending}
-          icon={Send}
-        >
-          {createEstimate.isPending ? "Creating..." : "Send Estimate"}
-        </WizardButton>
       </div>
     </div>
   );

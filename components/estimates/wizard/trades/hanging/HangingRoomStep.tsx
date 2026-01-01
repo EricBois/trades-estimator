@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import {
   Plus,
@@ -12,12 +12,12 @@ import {
   AppWindow,
 } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { HangingOpeningsSheet } from "./HangingOpeningsSheet";
 import { ShapeSelector } from "./ShapeSelector";
 import { ShapeDimensionInputs } from "./ShapeDimensionInputs";
 import { HangingRoom, WallSegment } from "@/lib/trades/drywallHanging/types";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 interface RoomCardProps {
   room: HangingRoom;
@@ -253,6 +253,7 @@ function RoomCard({
 
 export function HangingRoomStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     rooms,
     addRoom,
@@ -274,6 +275,20 @@ export function HangingRoomStep() {
     type: "doors" | "windows";
   }>({ isOpen: false, roomId: "", type: "doors" });
 
+  const totalSqft = rooms.reduce((sum, room) => sum + room.totalSqft, 0);
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: rooms.length === 0 || totalSqft === 0,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, rooms.length, totalSqft]);
+
   const handleToggleExpand = (roomId: string) => {
     setExpandedRoomId(expandedRoomId === roomId ? null : roomId);
   };
@@ -287,8 +302,6 @@ export function HangingRoomStep() {
   const handleAddOpening = (roomId: string, type: "doors" | "windows") => {
     setOpeningSheet({ isOpen: true, roomId, type });
   };
-
-  const totalSqft = rooms.reduce((sum, room) => sum + room.totalSqft, 0);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
@@ -338,15 +351,6 @@ export function HangingRoomStep() {
           </div>
         </div>
       )}
-
-      <div className="mt-6">
-        <WizardButton
-          onClick={() => nextStep()}
-          disabled={rooms.length === 0 || totalSqft === 0}
-        >
-          Continue
-        </WizardButton>
-      </div>
 
       {/* Opening sheet */}
       <HangingOpeningsSheet

@@ -1,18 +1,31 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { cn } from "@/lib/utils";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
+import { useWizardFooter } from "../WizardFooterContext";
 import {
   DRYWALL_FINISH_LEVELS,
   DRYWALL_ADDONS,
 } from "@/lib/trades/drywallFinishing/constants";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 export function ProjectFinishingConfigStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { finishingEstimate, getTradeRoomViews } = useProjectEstimateContext();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   const {
     finishLevel,
@@ -136,12 +149,6 @@ export function ProjectFinishingConfigStep() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <WizardButton onClick={nextStep} className="w-full max-w-lg mx-auto">
-          Continue
-        </WizardButton>
       </div>
     </div>
   );

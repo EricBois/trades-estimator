@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { cn } from "@/lib/utils";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
+import { useWizardFooter } from "../WizardFooterContext";
 import {
   PAINT_COAT_OPTIONS,
   PAINT_QUALITY_OPTIONS,
@@ -10,11 +12,22 @@ import {
   PAINTING_ADDONS,
 } from "@/lib/trades/painting/constants";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 export function ProjectPaintingConfigStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { paintingEstimate, getTradeRoomViews } = useProjectEstimateContext();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   const {
     coatCount,
@@ -210,12 +223,6 @@ export function ProjectPaintingConfigStep() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <WizardButton onClick={nextStep} className="w-full max-w-lg mx-auto">
-          Continue
-        </WizardButton>
       </div>
     </div>
   );

@@ -1,12 +1,13 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Hammer, Sparkles, Paintbrush, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
-import { ProjectTradeType, TRADE_DISPLAY_INFO } from "@/lib/project/types";
+import { useWizardFooter } from "../WizardFooterContext";
+import { TRADE_DISPLAY_INFO } from "@/lib/project/types";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 // Icon mapping
 const TRADE_ICONS = {
@@ -17,10 +18,23 @@ const TRADE_ICONS = {
 
 export function ProjectTradeSelectionStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { enabledTrades, toggleTrade, isTradeEnabled } =
     useProjectEstimateContext();
 
   const canContinue = enabledTrades.length > 0;
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: !canContinue,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, canContinue]);
 
   return (
     <div className="flex flex-col h-full">
@@ -88,16 +102,6 @@ export function ProjectTradeSelectionStep() {
             Select at least one trade to continue
           </p>
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <WizardButton
-          onClick={nextStep}
-          disabled={!canContinue}
-          className="w-full max-w-lg mx-auto"
-        >
-          Continue
-        </WizardButton>
       </div>
     </div>
   );

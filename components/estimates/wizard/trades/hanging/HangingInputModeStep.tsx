@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Calculator, Grid3X3, Hammer } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { HangingInputMode } from "@/lib/trades/drywallHanging/types";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { OptionCard } from "@/components/ui/OptionCard";
@@ -30,7 +32,20 @@ const INPUT_MODES = [
 
 export function HangingInputModeStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { inputMode, setInputMode, addRoom } = useHangingEstimate();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: !inputMode,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, inputMode]);
 
   const handleSelect = (mode: HangingInputMode) => {
     setInputMode(mode);
