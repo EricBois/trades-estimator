@@ -202,3 +202,45 @@ export function getHangingRateRangeInfo(rateType: HangingRateType): {
     ...labels[rateType],
   };
 }
+
+/**
+ * Get effective material cost for a sheet, respecting override
+ */
+export function getEffectiveSheetMaterialCost(
+  typeId: DrywallSheetTypeId,
+  customRates: CustomRates | null | undefined,
+  override?: number
+): number {
+  if (override !== undefined) {
+    return override;
+  }
+  return getSheetMaterialCost(typeId, customRates);
+}
+
+/**
+ * Get effective labor cost for a sheet, respecting override
+ */
+export function getEffectiveSheetLaborCost(
+  typeId: DrywallSheetTypeId,
+  customRates: CustomRates | null | undefined,
+  override?: number
+): number {
+  if (override !== undefined) {
+    return override;
+  }
+  return getSheetLaborCost(typeId, customRates);
+}
+
+/**
+ * Get effective addon price, respecting override
+ */
+export function getEffectiveAddonPrice(
+  addonId: string,
+  customRates: CustomRates | null | undefined,
+  override?: number
+): number {
+  if (override !== undefined) {
+    return override;
+  }
+  return getUserHangingAddonPrice(addonId, customRates);
+}

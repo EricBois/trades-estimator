@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { Mail, User, Phone, FileText, Loader2, Send } from "lucide-react";
+import { Mail, User, Phone, FileText } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { useCreateEstimate } from "@/hooks/useEstimates";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/estimateCalculations";
@@ -13,8 +14,10 @@ import { cn } from "@/lib/utils";
 export function DrywallSendEstimate() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { setFooterConfig } = useWizardFooter();
   const createEstimate = useCreateEstimate();
-  const { finishLevel, lineItems, addons, complexity, totals } = useDrywallEstimate();
+  const { finishLevel, lineItems, addons, complexity, totals } =
+    useDrywallEstimate();
 
   const [homeownerName, setHomeownerName] = useState("");
   const [homeownerEmail, setHomeownerEmail] = useState("");
@@ -23,7 +26,7 @@ export function DrywallSendEstimate() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const validate = () => {
+  const validate = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
     if (!homeownerName.trim()) {
@@ -37,9 +40,9 @@ export function DrywallSendEstimate() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [homeownerName, homeownerEmail]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!validate() || !profile) return;
 
     setIsSubmitting(true);
@@ -84,12 +87,47 @@ export function DrywallSendEstimate() {
     } catch (error) {
       console.error("Failed to create estimate:", error);
       setErrors({
-        submit: error instanceof Error ? error.message : "Failed to create estimate",
+        submit:
+          error instanceof Error ? error.message : "Failed to create estimate",
       });
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [
+    validate,
+    profile,
+    finishLevel,
+    lineItems,
+    addons,
+    complexity,
+    totals,
+    createEstimate,
+    homeownerName,
+    homeownerEmail,
+    homeownerPhone,
+    projectDescription,
+    router,
+  ]);
+
+  // Use ref to avoid useEffect dependency on handleSubmit
+  const handleSubmitRef = useRef(handleSubmit);
+
+  // Update ref in an effect to satisfy linter
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  });
+
+  // Configure footer with send button
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: () => handleSubmitRef.current(),
+      continueText: "Send Estimate",
+      icon: "send",
+      isLoading: isSubmitting,
+      loadingText: "Creating...",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, isSubmitting]);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6">
@@ -201,32 +239,6 @@ export function DrywallSendEstimate() {
           <p className="text-sm text-red-700">{errors.submit}</p>
         </div>
       )}
-
-      {/* Submit Button */}
-      <button
-        onClick={handleSubmit}
-        disabled={isSubmitting}
-        className={cn(
-          "w-full flex items-center justify-center gap-2 mt-6",
-          "min-h-[60px] px-6",
-          "bg-blue-600 text-white rounded-xl",
-          "hover:bg-blue-700 active:scale-[0.98]",
-          "transition-all font-medium text-lg cursor-pointer",
-          "disabled:opacity-50 disabled:cursor-not-allowed"
-        )}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Creating...
-          </>
-        ) : (
-          <>
-            <Send className="w-5 h-5" />
-            Send Estimate
-          </>
-        )}
-      </button>
     </div>
   );
 }

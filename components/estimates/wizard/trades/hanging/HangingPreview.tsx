@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_SHEET_TYPES,
   DRYWALL_SHEET_SIZES,
@@ -11,11 +13,11 @@ import {
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 import { EditButton } from "@/components/ui/EditButton";
 
 export function HangingPreview() {
   const { nextStep, goToStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const {
     inputMode,
     rooms,
@@ -25,11 +27,28 @@ export function HangingPreview() {
     ceilingFactor,
     wasteFactor,
     totals,
+    directSqft,
+    defaultRates,
   } = useHangingEstimate();
 
-  // Calculate step indices for edit navigation
+  // Configure footer with "Send to Homeowner" button
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Send to Homeowner",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
+
+  // Calculate step indices for edit navigation based on mode
+  // Calculator: 0=Mode, 1=Rooms, 2=SheetType, 3=Addons, 4=Complexity, 5=Preview
+  // Direct:     0=Mode, 1=DirectEntry, 2=Addons, 3=Complexity, 4=Preview
+  // Labor Only: 0=Mode, 1=LaborOnly, 2=Addons, 3=Complexity, 4=Preview
   const roomsStepIndex = 1;
   const sheetTypeStepIndex = inputMode === "calculator" ? 2 : 1;
+  const laborOnlyStepIndex = 1;
   const addonsStepIndex = inputMode === "calculator" ? 3 : 2;
   const complexityStepIndex = inputMode === "calculator" ? 4 : 3;
 
@@ -46,14 +65,22 @@ export function HangingPreview() {
 
       {/* Big Total */}
       <div className="bg-blue-600 rounded-2xl p-6 mb-6 text-center">
-        <div className="text-blue-200 text-sm mb-1">Total Estimate</div>
+        <div className="text-blue-200 text-sm mb-1">
+          {inputMode === "labor_only"
+            ? "Labor Only Estimate"
+            : "Total Estimate"}
+        </div>
         <div className="text-5xl font-bold text-white mb-2">
           ${formatCurrency(totals.total)}
         </div>
         <div className="flex justify-center gap-4 text-blue-200 text-sm">
           <span>{totals.totalSqft.toFixed(0)} sqft</span>
-          <span>•</span>
-          <span>{totals.sheetsNeeded} sheets</span>
+          {inputMode !== "labor_only" && (
+            <>
+              <span>•</span>
+              <span>{totals.sheetsNeeded} sheets</span>
+            </>
+          )}
           <span>•</span>
           <span>${formatCurrency(totals.costPerSqft)}/sqft</span>
         </div>
@@ -87,60 +114,95 @@ export function HangingPreview() {
           </div>
         )}
 
-        {/* Sheets */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-900">Drywall Sheets</h3>
-            <EditButton onClick={() => goToStep(sheetTypeStepIndex)} />
-          </div>
-          <div className="space-y-2">
-            {sheets.map((sheet) => {
-              const sheetType = DRYWALL_SHEET_TYPES.find(
-                (t) => t.id === sheet.typeId
-              );
-              const sheetSize = DRYWALL_SHEET_SIZES.find(
-                (s) => s.value === sheet.size
-              );
-
-              return (
-                <div key={sheet.id} className="flex justify-between text-sm">
-                  <span className="text-gray-600">
-                    {sheetType?.label} ({sheetSize?.label}) × {sheet.quantity}
-                  </span>
-                  <span className="text-gray-900">
-                    ${formatCurrency(sheet.subtotal)}
-                  </span>
-                </div>
-              );
-            })}
-            {inputMode === "calculator" && (
-              <div className="text-xs text-gray-500">
-                Includes {(wasteFactor * 100).toFixed(0)}% waste factor
+        {/* Labor Only Section */}
+        {inputMode === "labor_only" && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Labor Only</h3>
+              <EditButton onClick={() => goToStep(laborOnlyStepIndex)} />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Square Footage</span>
+                <span className="text-gray-900">{directSqft} sqft</span>
               </div>
-            )}
-          </div>
-          <div className="border-t border-gray-100 pt-2 mt-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Materials</span>
-              <span className="text-gray-900">
-                ${formatCurrency(totals.materialSubtotal)}
-              </span>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Labor Rate</span>
+                <span className="text-gray-900">
+                  ${(defaultRates.labor_per_sqft ?? 0.35).toFixed(2)}/sqft
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">
-                Labor
-                {ceilingFactorInfo && ceilingFactorInfo.multiplier !== 1 && (
-                  <span className="text-xs text-gray-400 ml-1">
-                    ({ceilingFactorInfo.label})
-                  </span>
-                )}
-              </span>
-              <span className="text-gray-900">
-                ${formatCurrency(totals.laborSubtotal)}
-              </span>
+            <div className="border-t border-gray-100 pt-2 mt-2">
+              <div className="flex justify-between text-sm font-medium">
+                <span className="text-gray-700">Labor Total</span>
+                <span className="text-gray-900">
+                  ${formatCurrency(totals.laborSubtotal)}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Client supplies all materials
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Sheets (calculator and direct modes only) */}
+        {inputMode !== "labor_only" && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Drywall Sheets</h3>
+              <EditButton onClick={() => goToStep(sheetTypeStepIndex)} />
+            </div>
+            <div className="space-y-2">
+              {sheets.map((sheet) => {
+                const sheetType = DRYWALL_SHEET_TYPES.find(
+                  (t) => t.id === sheet.typeId
+                );
+                const sheetSize = DRYWALL_SHEET_SIZES.find(
+                  (s) => s.value === sheet.size
+                );
+
+                return (
+                  <div key={sheet.id} className="flex justify-between text-sm">
+                    <span className="text-gray-600">
+                      {sheetType?.label} ({sheetSize?.label}) × {sheet.quantity}
+                    </span>
+                    <span className="text-gray-900">
+                      ${formatCurrency(sheet.subtotal)}
+                    </span>
+                  </div>
+                );
+              })}
+              {inputMode === "calculator" && (
+                <div className="text-xs text-gray-500">
+                  Includes {(wasteFactor * 100).toFixed(0)}% waste factor
+                </div>
+              )}
+            </div>
+            <div className="border-t border-gray-100 pt-2 mt-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Materials</span>
+                <span className="text-gray-900">
+                  ${formatCurrency(totals.materialSubtotal)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">
+                  Labor
+                  {ceilingFactorInfo && ceilingFactorInfo.multiplier !== 1 && (
+                    <span className="text-xs text-gray-400 ml-1">
+                      ({ceilingFactorInfo.label})
+                    </span>
+                  )}
+                </span>
+                <span className="text-gray-900">
+                  ${formatCurrency(totals.laborSubtotal)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add-ons */}
         {addons.length > 0 && (
@@ -211,12 +273,6 @@ export function HangingPreview() {
             </span>
           </div>
         </div>
-      </div>
-
-      <div className="mt-6">
-        <WizardButton onClick={() => nextStep()}>
-          Send to Homeowner
-        </WizardButton>
       </div>
     </div>
   );

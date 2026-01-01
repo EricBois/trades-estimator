@@ -1,11 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { Plus, Minus, ChevronRight } from "lucide-react";
+import { Plus, Minus } from "lucide-react";
 import { useWizardData } from "./WizardDataContext";
+import { useWizardFooter } from "./WizardFooterContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { calculateEstimateRange, formatCurrency } from "@/lib/estimateCalculations";
+import {
+  calculateEstimateRange,
+  formatCurrency,
+} from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 
 interface SelectOption {
@@ -23,7 +27,9 @@ interface RequiredField {
   unit?: string;
 }
 
-function normalizeOptions(options: SelectOption[] | string[] | undefined): SelectOption[] {
+function normalizeOptions(
+  options: SelectOption[] | string[] | undefined
+): SelectOption[] {
   if (!options || !Array.isArray(options)) return [];
   return options.map((opt) => {
     if (typeof opt === "string") {
@@ -35,8 +41,20 @@ function normalizeOptions(options: SelectOption[] | string[] | undefined): Selec
 
 export function QuantityStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { template, parameters, setParameter, complexity } = useWizardData();
   const { profile } = useAuth();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   // Parse required fields from template
   const requiredFields = useMemo(() => {
@@ -58,16 +76,17 @@ export function QuantityStep() {
     });
   }, [template, parameters, complexity, profile?.hourly_rate]);
 
-  const handleNumberChange = (key: string, delta: number, min?: number, max?: number) => {
+  const handleNumberChange = (
+    key: string,
+    delta: number,
+    min?: number,
+    max?: number
+  ) => {
     const currentValue = (parameters[key] as number) || 0;
     let newValue = currentValue + delta;
     if (min !== undefined) newValue = Math.max(min, newValue);
     if (max !== undefined) newValue = Math.min(max, newValue);
     setParameter(key, newValue);
-  };
-
-  const handleContinue = () => {
-    nextStep();
   };
 
   // No required fields - show simple continue
@@ -89,20 +108,6 @@ export function QuantityStep() {
             </span>
           </div>
         )}
-
-        <button
-          onClick={handleContinue}
-          className={cn(
-            "w-full flex items-center justify-center gap-2",
-            "min-h-[60px] px-6",
-            "bg-blue-600 text-white rounded-xl",
-            "hover:bg-blue-700 active:scale-[0.98]",
-            "transition-all font-medium text-lg"
-          )}
-        >
-          Continue
-          <ChevronRight className="w-5 h-5" />
-        </button>
       </div>
     );
   }
@@ -112,24 +117,30 @@ export function QuantityStep() {
       <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
         Quick details
       </h1>
-      <p className="text-gray-500 text-center mb-8">
-        Adjust the job specifics
-      </p>
+      <p className="text-gray-500 text-center mb-8">Adjust the job specifics</p>
 
       <div className="space-y-6">
         {requiredFields.map((field) => (
-          <div key={field.key} className="bg-white rounded-xl p-5 border border-gray-200">
+          <div
+            key={field.key}
+            className="bg-white rounded-xl p-5 border border-gray-200"
+          >
             <label className="block text-base font-medium text-gray-700 mb-3">
               {field.label}
               {field.unit && (
-                <span className="text-gray-400 font-normal"> ({field.unit})</span>
+                <span className="text-gray-400 font-normal">
+                  {" "}
+                  ({field.unit})
+                </span>
               )}
             </label>
 
             {field.type === "number" ? (
               <div className="flex items-center justify-center gap-4 sm:gap-6">
                 <button
-                  onClick={() => handleNumberChange(field.key, -1, field.min, field.max)}
+                  onClick={() =>
+                    handleNumberChange(field.key, -1, field.min, field.max)
+                  }
                   className={cn(
                     "w-14 h-14 sm:w-16 sm:h-16 rounded-xl",
                     "bg-gray-100 hover:bg-gray-200",
@@ -146,8 +157,10 @@ export function QuantityStep() {
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val)) {
                       let newVal = val;
-                      if (field.min !== undefined) newVal = Math.max(field.min, newVal);
-                      if (field.max !== undefined) newVal = Math.min(field.max, newVal);
+                      if (field.min !== undefined)
+                        newVal = Math.max(field.min, newVal);
+                      if (field.max !== undefined)
+                        newVal = Math.min(field.max, newVal);
                       setParameter(field.key, newVal);
                     }
                   }}
@@ -160,7 +173,9 @@ export function QuantityStep() {
                   )}
                 />
                 <button
-                  onClick={() => handleNumberChange(field.key, 1, field.min, field.max)}
+                  onClick={() =>
+                    handleNumberChange(field.key, 1, field.min, field.max)
+                  }
                   className={cn(
                     "w-14 h-14 sm:w-16 sm:h-16 rounded-xl",
                     "bg-blue-100 hover:bg-blue-200",
@@ -216,30 +231,15 @@ export function QuantityStep() {
         ))}
       </div>
 
-      {/* Price preview and continue button */}
-      <div className="mt-6 space-y-3">
-        {estimateRange && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-4 text-center">
-            <span className="text-sm text-blue-600">Estimated: </span>
-            <span className="text-xl font-bold text-blue-900">
-              ${formatCurrency(estimateRange.total)}
-            </span>
-          </div>
-        )}
-        <button
-          onClick={handleContinue}
-          className={cn(
-            "w-full flex items-center justify-center gap-2",
-            "min-h-[60px] px-6",
-            "bg-blue-600 text-white rounded-xl",
-            "hover:bg-blue-700 active:scale-[0.98]",
-            "transition-all font-medium text-lg"
-          )}
-        >
-          Continue
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Price preview */}
+      {estimateRange && (
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-4 text-center">
+          <span className="text-sm text-blue-600">Estimated: </span>
+          <span className="text-xl font-bold text-blue-900">
+            ${formatCurrency(estimateRange.total)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

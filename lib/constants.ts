@@ -43,6 +43,7 @@ export const COMPLEXITY_LEVELS = [
 
 // Wizard-specific trade types (MVP: interior systems only)
 export const WIZARD_TRADE_TYPES = [
+  { value: "multi_trade", label: "Multi-Trade Project", icon: "Layers" },
   { value: "framing", label: "Framing", icon: "Hammer" },
   { value: "drywall", label: "Drywall", icon: "Home" },
   { value: "drywall_finishing", label: "Drywall Finishing", icon: "Sparkles" },
@@ -65,8 +66,16 @@ export const COMPLEXITY_DESCRIPTIONS: Record<string, string> = {
 // Pricing types for templates
 export const PRICING_TYPES = [
   { value: "hourly", label: "Hourly", description: "Charge by the hour" },
-  { value: "contract", label: "Contract", description: "Fixed price for the job" },
-  { value: "hybrid", label: "Hybrid", description: "Base price + hourly for extras" },
+  {
+    value: "contract",
+    label: "Contract",
+    description: "Fixed price for the job",
+  },
+  {
+    value: "hybrid",
+    label: "Hybrid",
+    description: "Base price + hourly for extras",
+  },
 ] as const;
 
 // Default templates for wizard (used when contractor has no templates)
@@ -157,7 +166,7 @@ export const DEFAULT_WIZARD_TEMPLATES = [
         type: "select",
         label: "Drywall Type",
         options: [
-          { value: "regular", label: "Regular 1/2\"" },
+          { value: "regular", label: 'Regular 1/2"' },
           { value: "moisture", label: "Moisture Resistant" },
           { value: "fire", label: "Fire Rated" },
         ],

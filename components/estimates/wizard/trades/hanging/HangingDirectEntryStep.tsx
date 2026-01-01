@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import {
   Plus,
   Trash2,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { useWizard } from "react-use-wizard";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_SHEET_TYPES,
   DRYWALL_SHEET_SIZES,
@@ -24,9 +26,10 @@ import {
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { CostSummary } from "@/components/ui/CostSummary";
+import { MaterialToggle } from "@/components/ui/MaterialToggle";
+import { InlineOverrideInput } from "@/components/ui/InlineOverrideInput";
 
 // Icon mapping
 const ICONS: Record<string, React.ElementType> = {
@@ -44,6 +47,9 @@ interface SheetCardProps {
   onUpdateType: (typeId: DrywallSheetTypeId) => void;
   onUpdateSize: (size: DrywallSheetSize) => void;
   onRemove: () => void;
+  onToggleMaterial: (include: boolean) => void;
+  onMaterialOverride: (override: number | undefined) => void;
+  onLaborOverride: (override: number | undefined) => void;
 }
 
 function SheetCard({
@@ -52,12 +58,25 @@ function SheetCard({
   onUpdateType,
   onUpdateSize,
   onRemove,
+  onToggleMaterial,
+  onMaterialOverride,
+  onLaborOverride,
 }: SheetCardProps) {
   const sheetType = DRYWALL_SHEET_TYPES.find((t) => t.id === sheet.typeId);
   const Icon = sheetType ? ICONS[sheetType.icon] || Square : Square;
 
+  // Get effective costs for display
+  const effectiveMaterialCost =
+    sheet.materialCostOverride ?? sheet.materialCost;
+  const effectiveLaborCost = sheet.laborCostOverride ?? sheet.laborCost;
+
   return (
-    <div className="bg-white border-2 border-gray-200 rounded-xl p-4">
+    <div
+      className={cn(
+        "bg-white border-2 rounded-xl p-4",
+        sheet.hasOverride ? "border-orange-200" : "border-gray-200"
+      )}
+    >
       {/* Type and Size selectors */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -99,6 +118,14 @@ function SheetCard({
         </button>
       </div>
 
+      {/* Material toggle */}
+      <div className="mb-4">
+        <MaterialToggle
+          included={sheet.includeMaterial}
+          onChange={onToggleMaterial}
+        />
+      </div>
+
       {/* Quantity stepper */}
       <div className="flex items-center justify-between">
         <QuantityStepper
@@ -111,28 +138,62 @@ function SheetCard({
         <span className="text-sm text-gray-500 ml-2">sheets</span>
       </div>
 
-      {/* Cost breakdown */}
+      {/* Cost breakdown with inline overrides */}
       <div className="mt-4 pt-4 border-t border-gray-200">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">
-            Material: ${sheet.materialCost.toFixed(2)} × {sheet.quantity}
-          </span>
-          <span className="text-gray-700">
-            ${formatCurrency(sheet.materialCost * sheet.quantity)}
-          </span>
+        {sheet.includeMaterial && (
+          <div className="flex justify-between items-center text-sm mb-2">
+            <span className="text-gray-500">Material per sheet:</span>
+            <InlineOverrideInput
+              value={effectiveMaterialCost}
+              defaultValue={sheet.materialCost}
+              override={sheet.materialCostOverride}
+              onOverrideChange={onMaterialOverride}
+            />
+          </div>
+        )}
+        <div className="flex justify-between items-center text-sm mb-2">
+          <span className="text-gray-500">Labor per sheet:</span>
+          <InlineOverrideInput
+            value={effectiveLaborCost}
+            defaultValue={sheet.laborCost}
+            override={sheet.laborCostOverride}
+            onOverrideChange={onLaborOverride}
+          />
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">
-            Labor: ${sheet.laborCost.toFixed(2)} × {sheet.quantity}
-          </span>
-          <span className="text-gray-700">
-            ${formatCurrency(sheet.laborCost * sheet.quantity)}
-          </span>
+
+        {/* Calculated totals */}
+        <div className="mt-2 pt-2 border-t border-gray-100">
+          {sheet.includeMaterial && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">
+                Material: ${effectiveMaterialCost.toFixed(2)} × {sheet.quantity}
+              </span>
+              <span className="text-gray-700">
+                ${formatCurrency(effectiveMaterialCost * sheet.quantity)}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">
+              Labor: ${effectiveLaborCost.toFixed(2)} × {sheet.quantity}
+            </span>
+            <span className="text-gray-700">
+              ${formatCurrency(effectiveLaborCost * sheet.quantity)}
+            </span>
+          </div>
         </div>
+
         <div className="flex justify-between font-medium mt-2 pt-2 border-t border-gray-100">
           <span className="text-gray-700">Subtotal</span>
-          <span className="text-blue-600">
+          <span
+            className={cn(
+              sheet.hasOverride ? "text-orange-600" : "text-blue-600"
+            )}
+          >
             ${formatCurrency(sheet.subtotal)}
+            {sheet.hasOverride && (
+              <span className="text-xs ml-1">(custom)</span>
+            )}
           </span>
         </div>
       </div>
@@ -142,14 +203,35 @@ function SheetCard({
 
 export function HangingDirectEntryStep() {
   const { nextStep } = useWizard();
-  const { sheets, addSheet, updateSheet, removeSheet, totals } =
-    useHangingEstimate();
+  const { setFooterConfig } = useWizardFooter();
+  const {
+    sheets,
+    addSheet,
+    updateSheet,
+    removeSheet,
+    totals,
+    setSheetIncludeMaterial,
+    setSheetMaterialCostOverride,
+    setSheetLaborCostOverride,
+  } = useHangingEstimate();
 
   const handleAddSheet = () => {
     addSheet("standard_half", "4x8", 1);
   };
 
   const totalSheets = sheets.reduce((sum, s) => sum + s.quantity, 0);
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: sheets.length === 0 || totalSheets === 0,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, sheets.length, totalSheets]);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
@@ -168,6 +250,15 @@ export function HangingDirectEntryStep() {
             onUpdateType={(typeId) => updateSheet(sheet.id, { typeId })}
             onUpdateSize={(size) => updateSheet(sheet.id, { size })}
             onRemove={() => removeSheet(sheet.id)}
+            onToggleMaterial={(include) =>
+              setSheetIncludeMaterial(sheet.id, include)
+            }
+            onMaterialOverride={(override) =>
+              setSheetMaterialCostOverride(sheet.id, override)
+            }
+            onLaborOverride={(override) =>
+              setSheetLaborCostOverride(sheet.id, override)
+            }
           />
         ))}
       </div>
@@ -193,15 +284,6 @@ export function HangingDirectEntryStep() {
           total={{ label: "Total", value: totals.subtotal }}
         />
       )}
-
-      <div className="mt-6">
-        <WizardButton
-          onClick={() => nextStep()}
-          disabled={sheets.length === 0 || totalSheets === 0}
-        >
-          Continue
-        </WizardButton>
-      </div>
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   getSheetMaterialCost,
   getSheetLaborCost,
   getUserDefaultWasteFactor,
+  getUserLaborPerSqft,
 } from "@/lib/trades/drywallHanging/rates";
 import {
   calculateRoomSqft,
@@ -39,6 +40,8 @@ import {
   DrywallSheetSize,
   HangingAddonId,
   UseDrywallHangingEstimateReturn,
+  WallSegment,
+  RoomShape,
 } from "@/lib/trades/drywallHanging/types";
 
 // Generate unique ID
@@ -47,16 +50,35 @@ function generateId(): string {
 }
 
 // Create a default room
-function createDefaultRoom(name: string = "Room 1"): HangingRoom {
+function createDefaultRoom(
+  name: string = "Room 1",
+  shape: RoomShape = "rectangular"
+): HangingRoom {
   return {
     id: generateId(),
     name,
+    shape,
     lengthFeet: 12,
     lengthInches: 0,
     widthFeet: 10,
     widthInches: 0,
     heightFeet: 8,
     heightInches: 0,
+    lShapeDimensions:
+      shape === "l_shape"
+        ? {
+            mainLengthFeet: 12,
+            mainLengthInches: 0,
+            mainWidthFeet: 10,
+            mainWidthInches: 0,
+            extLengthFeet: 8,
+            extLengthInches: 0,
+            extWidthFeet: 6,
+            extWidthInches: 0,
+          }
+        : undefined,
+    customWalls: [],
+    customCeilingSqft: undefined,
     includeCeiling: false,
     doors: [],
     windows: [],
@@ -71,9 +93,13 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
   const { profile } = useAuth();
 
   // State
-  const [inputMode, setInputMode] = useState<HangingInputMode>("calculator");
+  const [inputMode, setInputModeState] =
+    useState<HangingInputMode>("calculator");
   const [pricingMethod, setPricingMethod] =
     useState<HangingPricingMethod>("per_sheet");
+  const [clientSuppliesMaterials, setClientSuppliesMaterialsState] =
+    useState<boolean>(false);
+  const [directSqft, setDirectSqftState] = useState<number>(0);
   const [rooms, setRooms] = useState<HangingRoom[]>([]);
   const [sheets, setSheets] = useState<HangingSheetEntry[]>([]);
   const [ceilingFactor, setCeilingFactor] =
@@ -141,6 +167,21 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         prev.map((room) => {
           if (room.id !== id) return room;
           const updatedRoom = { ...room, ...updates };
+
+          // Initialize lShapeDimensions when switching to L-shape
+          if (updates.shape === "l_shape" && !updatedRoom.lShapeDimensions) {
+            updatedRoom.lShapeDimensions = {
+              mainLengthFeet: 12,
+              mainLengthInches: 0,
+              mainWidthFeet: 10,
+              mainWidthInches: 0,
+              extLengthFeet: 8,
+              extLengthInches: 0,
+              extWidthFeet: 6,
+              extWidthInches: 0,
+            };
+          }
+
           return updateRoomCalculations(updatedRoom);
         })
       );
@@ -263,6 +304,71 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     [updateRoomCalculations]
   );
 
+  // Custom wall management
+  const addCustomWall = useCallback(
+    (roomId: string) => {
+      setRooms((prev) =>
+        prev.map((room) => {
+          if (room.id !== roomId) return room;
+          const wallNumber = room.customWalls.length + 1;
+          const newWall: WallSegment = {
+            id: generateId(),
+            lengthFeet: 10,
+            lengthInches: 0,
+            label: `Wall ${wallNumber}`,
+            sqft: 0,
+          };
+          const updatedRoom = {
+            ...room,
+            customWalls: [...room.customWalls, newWall],
+          };
+          return updateRoomCalculations(updatedRoom);
+        })
+      );
+    },
+    [updateRoomCalculations]
+  );
+
+  const updateCustomWall = useCallback(
+    (
+      roomId: string,
+      wallId: string,
+      updates: Partial<Omit<WallSegment, "id" | "sqft">>
+    ) => {
+      setRooms((prev) =>
+        prev.map((room) => {
+          if (room.id !== roomId) return room;
+          const updatedWalls = room.customWalls.map((wall) => {
+            if (wall.id !== wallId) return wall;
+            return { ...wall, ...updates };
+          });
+          const updatedRoom = {
+            ...room,
+            customWalls: updatedWalls,
+          };
+          return updateRoomCalculations(updatedRoom);
+        })
+      );
+    },
+    [updateRoomCalculations]
+  );
+
+  const removeCustomWall = useCallback(
+    (roomId: string, wallId: string) => {
+      setRooms((prev) =>
+        prev.map((room) => {
+          if (room.id !== roomId) return room;
+          const updatedRoom = {
+            ...room,
+            customWalls: room.customWalls.filter((w) => w.id !== wallId),
+          };
+          return updateRoomCalculations(updatedRoom);
+        })
+      );
+    },
+    [updateRoomCalculations]
+  );
+
   // Sheet management
   const addSheet = useCallback(
     (
@@ -283,6 +389,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         laborCost,
         totalPerSheet,
         subtotal: totalPerSheet * quantity,
+        includeMaterial: true,
+        materialCostOverride: undefined,
+        laborCostOverride: undefined,
+        hasOverride: false,
       };
 
       setSheets((prev) => [...prev, newSheet]);
@@ -309,9 +419,19 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
               customRates
             );
             updated.laborCost = getSheetLaborCost(updates.typeId, customRates);
+            // Clear overrides when type changes
+            updated.materialCostOverride = undefined;
+            updated.laborCostOverride = undefined;
+            updated.hasOverride = false;
           }
 
-          updated.totalPerSheet = updated.materialCost + updated.laborCost;
+          // Calculate effective costs (respecting overrides and material toggle)
+          const effectiveMaterial = updated.includeMaterial
+            ? updated.materialCostOverride ?? updated.materialCost
+            : 0;
+          const effectiveLabor = updated.laborCostOverride ?? updated.laborCost;
+
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
           updated.subtotal = updated.totalPerSheet * updated.quantity;
           return updated;
         })
@@ -364,10 +484,63 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
           laborCost,
           totalPerSheet,
           subtotal: totalPerSheet * sheetsNeeded,
+          includeMaterial: currentSheet?.includeMaterial ?? true,
+          materialCostOverride: currentSheet?.materialCostOverride,
+          laborCostOverride: currentSheet?.laborCostOverride,
+          hasOverride: currentSheet?.hasOverride ?? false,
         },
       ];
     });
   }, [rooms, wasteFactor, customRates]);
+
+  // Set sqft directly and update sheets (for project wizard integration)
+  const setSqft = useCallback(
+    (totalSqft: number) => {
+      if (totalSqft <= 0) {
+        return;
+      }
+
+      // Preserve current selection or use defaults
+      setSheets((prevSheets) => {
+        const currentSheet = prevSheets[0];
+        const typeId: DrywallSheetTypeId =
+          currentSheet?.typeId ?? "standard_half";
+        const size: DrywallSheetSize = currentSheet?.size ?? "4x8";
+        const sheetId = currentSheet?.id ?? generateId();
+
+        const sizeInfo = getSheetSize(size);
+        if (!sizeInfo) return prevSheets;
+
+        const sheetsNeeded = calculateSheetsNeeded(
+          totalSqft,
+          size,
+          wasteFactor
+        );
+
+        const materialCost = getSheetMaterialCost(typeId, customRates);
+        const laborCost = getSheetLaborCost(typeId, customRates);
+        const totalPerSheet = materialCost + laborCost;
+
+        return [
+          {
+            id: sheetId,
+            typeId,
+            size,
+            quantity: sheetsNeeded,
+            materialCost,
+            laborCost,
+            totalPerSheet,
+            subtotal: totalPerSheet * sheetsNeeded,
+            includeMaterial: currentSheet?.includeMaterial ?? true,
+            materialCostOverride: currentSheet?.materialCostOverride,
+            laborCostOverride: currentSheet?.laborCostOverride,
+            hasOverride: currentSheet?.hasOverride ?? false,
+          },
+        ];
+      });
+    },
+    [wasteFactor, customRates]
+  );
 
   // Addon management
   const toggleAddon = useCallback(
@@ -385,7 +558,16 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         const price = getUserHangingAddonPrice(addonId, customRates);
         const total = addonDef.unit === "flat" ? price : price * quantity;
 
-        return [...prev, { id: addonId, quantity, total }];
+        return [
+          ...prev,
+          {
+            id: addonId,
+            quantity,
+            total,
+            priceOverride: undefined,
+            hasOverride: false,
+          },
+        ];
       });
     },
     [customRates]
@@ -413,10 +595,146 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     setAddons((prev) => prev.filter((a) => a.id !== addonId));
   }, []);
 
+  // Material toggle and override actions
+  const setSheetIncludeMaterial = useCallback(
+    (id: string, include: boolean) => {
+      setSheets((prev) =>
+        prev.map((sheet) => {
+          if (sheet.id !== id) return sheet;
+          const updated = { ...sheet, includeMaterial: include };
+          // Recalculate totals
+          const effectiveMaterial = include
+            ? updated.materialCostOverride ?? updated.materialCost
+            : 0;
+          const effectiveLabor = updated.laborCostOverride ?? updated.laborCost;
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+          updated.subtotal = updated.totalPerSheet * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setSheetMaterialCostOverride = useCallback(
+    (id: string, override: number | undefined) => {
+      setSheets((prev) =>
+        prev.map((sheet) => {
+          if (sheet.id !== id) return sheet;
+          const updated = {
+            ...sheet,
+            materialCostOverride: override,
+            hasOverride:
+              override !== undefined || sheet.laborCostOverride !== undefined,
+          };
+          // Recalculate totals
+          const effectiveMaterial = updated.includeMaterial
+            ? override ?? sheet.materialCost
+            : 0;
+          const effectiveLabor = updated.laborCostOverride ?? sheet.laborCost;
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+          updated.subtotal = updated.totalPerSheet * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setSheetLaborCostOverride = useCallback(
+    (id: string, override: number | undefined) => {
+      setSheets((prev) =>
+        prev.map((sheet) => {
+          if (sheet.id !== id) return sheet;
+          const updated = {
+            ...sheet,
+            laborCostOverride: override,
+            hasOverride:
+              sheet.materialCostOverride !== undefined ||
+              override !== undefined,
+          };
+          // Recalculate totals
+          const effectiveMaterial = updated.includeMaterial
+            ? sheet.materialCostOverride ?? sheet.materialCost
+            : 0;
+          const effectiveLabor = override ?? sheet.laborCost;
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+          updated.subtotal = updated.totalPerSheet * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setAddonPriceOverride = useCallback(
+    (addonId: HangingAddonId, override: number | undefined) => {
+      setAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== addonId) return addon;
+          const addonDef = HANGING_ADDONS.find((a) => a.id === addonId);
+          if (!addonDef) return addon;
+
+          const price =
+            override ?? getUserHangingAddonPrice(addonId, customRates);
+          const total =
+            addonDef.unit === "flat" ? price : price * addon.quantity;
+
+          return {
+            ...addon,
+            priceOverride: override,
+            hasOverride: override !== undefined,
+            total,
+          };
+        })
+      );
+    },
+    [customRates]
+  );
+
+  // Input mode setter with side effects for labor_only mode
+  const setInputMode = useCallback((mode: HangingInputMode) => {
+    setInputModeState(mode);
+    if (mode === "labor_only") {
+      // When switching to labor_only, set pricing to per_sqft and enable client supplies materials
+      setPricingMethod("per_sqft");
+      setClientSuppliesMaterialsState(true);
+    } else {
+      // When switching away from labor_only, reset to per_sheet pricing
+      setPricingMethod("per_sheet");
+    }
+  }, []);
+
+  // Client supplies materials setter - also updates all sheets
+  const setClientSuppliesMaterials = useCallback((value: boolean) => {
+    setClientSuppliesMaterialsState(value);
+    // Update all existing sheets to match
+    setSheets((prev) =>
+      prev.map((sheet) => {
+        const updated = { ...sheet, includeMaterial: !value };
+        // Recalculate totals
+        const effectiveMaterial = updated.includeMaterial
+          ? updated.materialCostOverride ?? updated.materialCost
+          : 0;
+        const effectiveLabor = updated.laborCostOverride ?? updated.laborCost;
+        updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+        updated.subtotal = updated.totalPerSheet * updated.quantity;
+        return updated;
+      })
+    );
+  }, []);
+
+  // Direct sqft setter for labor_only mode
+  const setDirectSqft = useCallback((sqft: number) => {
+    setDirectSqftState(sqft);
+  }, []);
+
   // Reset all state
   const reset = useCallback(() => {
-    setInputMode("calculator");
+    setInputModeState("calculator");
     setPricingMethod("per_sheet");
+    setClientSuppliesMaterialsState(false);
+    setDirectSqftState(0);
     setRooms([]);
     setSheets([]);
     setCeilingFactor("standard");
@@ -427,6 +745,50 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
 
   // Calculate totals
   const totals = useMemo((): HangingEstimateTotals => {
+    // Get labor per sqft rate for per_sqft pricing
+    const laborPerSqft = getUserLaborPerSqft(customRates);
+
+    // Handle labor_only mode with per_sqft pricing
+    if (inputMode === "labor_only" && pricingMethod === "per_sqft") {
+      const totalSqft = directSqft;
+
+      // Labor only calculation - no materials, just sqft * rate
+      const ceilingFactorInfo = getCeilingFactor(ceilingFactor);
+      const ceilingMultiplier = ceilingFactorInfo?.multiplier ?? 1;
+      const laborSubtotal = totalSqft * laborPerSqft * ceilingMultiplier;
+
+      // No material cost in labor_only mode
+      const materialSubtotal = 0;
+
+      // Addons subtotal
+      const addonsSubtotal = addons.reduce((sum, a) => sum + a.total, 0);
+
+      // Subtotal
+      const subtotal = materialSubtotal + laborSubtotal + addonsSubtotal;
+
+      // Complexity adjustment
+      const complexityMultiplier = HANGING_COMPLEXITY_MULTIPLIERS[complexity];
+      const complexityAdjustment = subtotal * (complexityMultiplier - 1);
+
+      // Total
+      const total = subtotal + complexityAdjustment;
+
+      return {
+        totalSqft: Math.round(totalSqft * 100) / 100,
+        sheetsNeeded: 0, // No sheets in labor_only mode
+        materialSubtotal: 0,
+        laborSubtotal: Math.round(laborSubtotal * 100) / 100,
+        addonsSubtotal: Math.round(addonsSubtotal * 100) / 100,
+        subtotal: Math.round(subtotal * 100) / 100,
+        complexityMultiplier,
+        complexityAdjustment: Math.round(complexityAdjustment * 100) / 100,
+        total: Math.round(total * 100) / 100,
+        costPerSqft: laborPerSqft * ceilingMultiplier * complexityMultiplier,
+        costPerSheet: 0,
+      };
+    }
+
+    // Standard calculation for calculator/direct modes (per_sheet pricing)
     // Total sqft from rooms or estimated from sheets
     const roomTotals = calculateTotalRoomsSqft(rooms);
     const totalSqft =
@@ -440,18 +802,21 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     // Total sheets
     const sheetsNeeded = sheets.reduce((sum, s) => sum + s.quantity, 0);
 
-    // Material subtotal
-    const materialSubtotal = sheets.reduce(
-      (sum, s) => sum + s.materialCost * s.quantity,
-      0
-    );
+    // Material subtotal (respect includeMaterial flag and overrides)
+    const materialSubtotal = sheets.reduce((sum, s) => {
+      if (!s.includeMaterial) return sum;
+      const effectiveCost = s.materialCostOverride ?? s.materialCost;
+      return sum + effectiveCost * s.quantity;
+    }, 0);
 
-    // Labor subtotal (apply ceiling factor)
+    // Labor subtotal (apply ceiling factor, respect overrides)
     const ceilingFactorInfo = getCeilingFactor(ceilingFactor);
     const ceilingMultiplier = ceilingFactorInfo?.multiplier ?? 1;
     const laborSubtotal =
-      sheets.reduce((sum, s) => sum + s.laborCost * s.quantity, 0) *
-      ceilingMultiplier;
+      sheets.reduce((sum, s) => {
+        const effectiveCost = s.laborCostOverride ?? s.laborCost;
+        return sum + effectiveCost * s.quantity;
+      }, 0) * ceilingMultiplier;
 
     // Addons subtotal
     const addonsSubtotal = addons.reduce((sum, a) => sum + a.total, 0);
@@ -483,12 +848,24 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       costPerSqft: Math.round(costPerSqft * 100) / 100,
       costPerSheet: Math.round(costPerSheet * 100) / 100,
     };
-  }, [inputMode, rooms, sheets, ceilingFactor, complexity, addons]);
+  }, [
+    inputMode,
+    pricingMethod,
+    directSqft,
+    rooms,
+    sheets,
+    ceilingFactor,
+    complexity,
+    addons,
+    customRates,
+  ]);
 
   return {
     // Data
     inputMode,
     pricingMethod,
+    clientSuppliesMaterials,
+    directSqft,
     rooms,
     sheets,
     ceilingFactor,
@@ -502,6 +879,8 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     // Actions
     setInputMode,
     setPricingMethod,
+    setClientSuppliesMaterials,
+    setDirectSqft,
     addRoom,
     updateRoom,
     removeRoom,
@@ -509,16 +888,24 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     addCustomOpening,
     updateOpening,
     removeOpening,
+    addCustomWall,
+    updateCustomWall,
+    removeCustomWall,
     addSheet,
     updateSheet,
     removeSheet,
     calculateSheetsFromRooms,
+    setSqft,
     setCeilingFactor,
     setWasteFactor,
     setComplexity,
     toggleAddon,
     updateAddonQuantity,
     removeAddon,
+    setSheetIncludeMaterial,
+    setSheetMaterialCostOverride,
+    setSheetLaborCostOverride,
+    setAddonPriceOverride,
     reset,
   };
 }

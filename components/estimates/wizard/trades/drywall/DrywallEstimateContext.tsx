@@ -1,12 +1,11 @@
 "use client";
 
 import { createContext, useContext, ReactNode } from "react";
-import {
-  useDrywallFinishingEstimate,
-} from "@/hooks/trades/useDrywallFinishingEstimate";
+import { useDrywallFinishingEstimate } from "@/hooks/trades/useDrywallFinishingEstimate";
 import { UseDrywallFinishingEstimateReturn } from "@/lib/trades/drywallFinishing/types";
 
-const DrywallEstimateContext = createContext<UseDrywallFinishingEstimateReturn | null>(null);
+const DrywallEstimateContext =
+  createContext<UseDrywallFinishingEstimateReturn | null>(null);
 
 export function DrywallEstimateProvider({ children }: { children: ReactNode }) {
   const estimate = useDrywallFinishingEstimate();
@@ -21,7 +20,14 @@ export function DrywallEstimateProvider({ children }: { children: ReactNode }) {
 export function useDrywallEstimate() {
   const context = useContext(DrywallEstimateContext);
   if (!context) {
-    throw new Error("useDrywallEstimate must be used within DrywallEstimateProvider");
+    throw new Error(
+      "useDrywallEstimate must be used within DrywallEstimateProvider"
+    );
   }
   return context;
+}
+
+// Safe version that returns null instead of throwing (for reusable components)
+export function useDrywallEstimateSafe() {
+  return useContext(DrywallEstimateContext);
 }

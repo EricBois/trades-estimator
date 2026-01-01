@@ -1,16 +1,33 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Check } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
-import { WIZARD_COMPLEXITY_LEVELS, COMPLEXITY_DESCRIPTIONS } from "@/lib/constants";
+import { useWizardFooter } from "../../WizardFooterContext";
+import {
+  WIZARD_COMPLEXITY_LEVELS,
+  COMPLEXITY_DESCRIPTIONS,
+} from "@/lib/constants";
 import { DrywallComplexity } from "@/lib/trades/drywallFinishing/types";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 
 export function DrywallComplexityStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { complexity, setComplexity, totals } = useDrywallEstimate();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   const handleSelect = (complexityValue: DrywallComplexity) => {
     setComplexity(complexityValue);
@@ -49,9 +66,7 @@ export function DrywallComplexityStep() {
               <div
                 className={cn(
                   "w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5",
-                  isSelected
-                    ? "border-blue-500 bg-blue-500"
-                    : "border-gray-300"
+                  isSelected ? "border-blue-500 bg-blue-500" : "border-gray-300"
                 )}
               >
                 {isSelected && <Check className="w-4 h-4 text-white" />}

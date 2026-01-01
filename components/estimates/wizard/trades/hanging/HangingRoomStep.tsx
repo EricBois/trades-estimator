@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import {
   Plus,
@@ -12,10 +12,12 @@ import {
   AppWindow,
 } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { HangingOpeningsSheet } from "./HangingOpeningsSheet";
-import { HangingRoom } from "@/lib/trades/drywallHanging/types";
+import { ShapeSelector } from "./ShapeSelector";
+import { ShapeDimensionInputs } from "./ShapeDimensionInputs";
+import { HangingRoom, WallSegment } from "@/lib/trades/drywallHanging/types";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { WizardButton } from "@/components/ui/WizardButton";
 
 interface RoomCardProps {
   room: HangingRoom;
@@ -25,6 +27,12 @@ interface RoomCardProps {
   onRemove: () => void;
   onAddOpening: (type: "doors" | "windows") => void;
   onRemoveOpening: (openingId: string) => void;
+  onAddWall: () => void;
+  onUpdateWall: (
+    wallId: string,
+    updates: Partial<Omit<WallSegment, "id" | "sqft">>
+  ) => void;
+  onRemoveWall: (wallId: string) => void;
 }
 
 function RoomCard({
@@ -35,6 +43,9 @@ function RoomCard({
   onRemove,
   onAddOpening,
   onRemoveOpening,
+  onAddWall,
+  onUpdateWall,
+  onRemoveWall,
 }: RoomCardProps) {
   return (
     <div className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden">
@@ -79,101 +90,25 @@ function RoomCard({
       {/* Expanded content */}
       {isExpanded && (
         <div className="border-t border-gray-200 p-4 space-y-4">
-          {/* Dimensions */}
-          <div className="grid grid-cols-3 gap-3">
-            {/* Length */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Length</label>
-              <div className="flex gap-1">
-                <div className="flex-1">
-                  <div className="flex items-center">
-                    <input
-                      type="number"
-                      value={room.lengthFeet}
-                      onChange={(e) =>
-                        onUpdate({ lengthFeet: parseInt(e.target.value) || 0 })
-                      }
-                      className="w-full h-12 text-center text-lg font-semibold border-2 border-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      min="0"
-                    />
-                    <span className="h-12 px-2 flex items-center bg-gray-100 border-y-2 border-gray-200 text-gray-500 text-sm">
-                      ft
-                    </span>
-                    <input
-                      type="number"
-                      value={room.lengthInches}
-                      onChange={(e) =>
-                        onUpdate({
-                          lengthInches: parseInt(e.target.value) || 0,
-                        })
-                      }
-                      className="w-12 h-12 text-center text-lg font-semibold border-2 border-l-0 border-gray-200 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      min="0"
-                      max="11"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Width */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Width</label>
-              <div className="flex items-center">
-                <input
-                  type="number"
-                  value={room.widthFeet}
-                  onChange={(e) =>
-                    onUpdate({ widthFeet: parseInt(e.target.value) || 0 })
-                  }
-                  className="w-full h-12 text-center text-lg font-semibold border-2 border-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min="0"
-                />
-                <span className="h-12 px-2 flex items-center bg-gray-100 border-y-2 border-gray-200 text-gray-500 text-sm">
-                  ft
-                </span>
-                <input
-                  type="number"
-                  value={room.widthInches}
-                  onChange={(e) =>
-                    onUpdate({ widthInches: parseInt(e.target.value) || 0 })
-                  }
-                  className="w-12 h-12 text-center text-lg font-semibold border-2 border-l-0 border-gray-200 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min="0"
-                  max="11"
-                />
-              </div>
-            </div>
-
-            {/* Height */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Height</label>
-              <div className="flex items-center">
-                <input
-                  type="number"
-                  value={room.heightFeet}
-                  onChange={(e) =>
-                    onUpdate({ heightFeet: parseInt(e.target.value) || 0 })
-                  }
-                  className="w-full h-12 text-center text-lg font-semibold border-2 border-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min="0"
-                />
-                <span className="h-12 px-2 flex items-center bg-gray-100 border-y-2 border-gray-200 text-gray-500 text-sm">
-                  ft
-                </span>
-                <input
-                  type="number"
-                  value={room.heightInches}
-                  onChange={(e) =>
-                    onUpdate({ heightInches: parseInt(e.target.value) || 0 })
-                  }
-                  className="w-12 h-12 text-center text-lg font-semibold border-2 border-l-0 border-gray-200 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min="0"
-                  max="11"
-                />
-              </div>
-            </div>
+          {/* Room Shape Selector */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-2">
+              Room Shape
+            </label>
+            <ShapeSelector
+              value={room.shape || "rectangular"}
+              onChange={(shape) => onUpdate({ shape })}
+            />
           </div>
+
+          {/* Dimensions based on shape */}
+          <ShapeDimensionInputs
+            room={room}
+            onUpdate={onUpdate}
+            onAddWall={onAddWall}
+            onUpdateWall={onUpdateWall}
+            onRemoveWall={onRemoveWall}
+          />
 
           {/* Include ceiling toggle */}
           <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
@@ -197,9 +132,11 @@ function RoomCard({
               <span className="text-sm font-medium text-gray-700">
                 Openings
               </span>
-              <span className="text-sm text-gray-500">
-                -{room.openingsSqft.toFixed(0)} sqft
-              </span>
+              {room.openingsSqft > 0 && (
+                <span className="text-sm text-gray-500">
+                  -{room.openingsSqft.toFixed(0)} sqft
+                </span>
+              )}
             </div>
 
             {/* List of openings */}
@@ -316,8 +253,18 @@ function RoomCard({
 
 export function HangingRoomStep() {
   const { nextStep } = useWizard();
-  const { rooms, addRoom, updateRoom, removeRoom, addOpening, removeOpening } =
-    useHangingEstimate();
+  const { setFooterConfig } = useWizardFooter();
+  const {
+    rooms,
+    addRoom,
+    updateRoom,
+    removeRoom,
+    addOpening,
+    removeOpening,
+    addCustomWall,
+    updateCustomWall,
+    removeCustomWall,
+  } = useHangingEstimate();
 
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(
     rooms[0]?.id ?? null
@@ -327,6 +274,20 @@ export function HangingRoomStep() {
     roomId: string;
     type: "doors" | "windows";
   }>({ isOpen: false, roomId: "", type: "doors" });
+
+  const totalSqft = rooms.reduce((sum, room) => sum + room.totalSqft, 0);
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: rooms.length === 0 || totalSqft === 0,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, rooms.length, totalSqft]);
 
   const handleToggleExpand = (roomId: string) => {
     setExpandedRoomId(expandedRoomId === roomId ? null : roomId);
@@ -341,8 +302,6 @@ export function HangingRoomStep() {
   const handleAddOpening = (roomId: string, type: "doors" | "windows") => {
     setOpeningSheet({ isOpen: true, roomId, type });
   };
-
-  const totalSqft = rooms.reduce((sum, room) => sum + room.totalSqft, 0);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
@@ -363,6 +322,11 @@ export function HangingRoomStep() {
             onRemove={() => removeRoom(room.id)}
             onAddOpening={(type) => handleAddOpening(room.id, type)}
             onRemoveOpening={(openingId) => removeOpening(room.id, openingId)}
+            onAddWall={() => addCustomWall(room.id)}
+            onUpdateWall={(wallId, updates) =>
+              updateCustomWall(room.id, wallId, updates)
+            }
+            onRemoveWall={(wallId) => removeCustomWall(room.id, wallId)}
           />
         ))}
       </div>
@@ -387,15 +351,6 @@ export function HangingRoomStep() {
           </div>
         </div>
       )}
-
-      <div className="mt-6">
-        <WizardButton
-          onClick={() => nextStep()}
-          disabled={rooms.length === 0 || totalSqft === 0}
-        >
-          Continue
-        </WizardButton>
-      </div>
 
       {/* Opening sheet */}
       <HangingOpeningsSheet

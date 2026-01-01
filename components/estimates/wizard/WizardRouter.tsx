@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Hammer, Home, Sparkles, Paintbrush, ArrowLeft } from "lucide-react";
+import {
+  Hammer,
+  Home,
+  Sparkles,
+  Paintbrush,
+  ArrowLeft,
+  Layers,
+} from "lucide-react";
 import Link from "next/link";
 import { WIZARD_TRADE_TYPES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Navbar } from "@/components/layout/Navbar";
 import { EstimateWizard } from "./EstimateWizard";
 import { DrywallEstimateWizard } from "./trades/drywall";
+import { ProjectWizard } from "./project";
 
 // Icon mapping for trades
 const TRADE_ICONS: Record<string, typeof Hammer> = {
@@ -15,6 +23,7 @@ const TRADE_ICONS: Record<string, typeof Hammer> = {
   Home,
   Sparkles,
   Paintbrush,
+  Layers,
 };
 
 function getTradeIcon(iconName: string) {
@@ -23,6 +32,11 @@ function getTradeIcon(iconName: string) {
 
 export function WizardRouter() {
   const [selectedTrade, setSelectedTrade] = useState<string | null>(null);
+
+  // If multi_trade is selected, render the project wizard
+  if (selectedTrade === "multi_trade") {
+    return <ProjectWizard />;
+  }
 
   // If drywall_finishing is selected, render the drywall wizard
   if (selectedTrade === "drywall_finishing") {

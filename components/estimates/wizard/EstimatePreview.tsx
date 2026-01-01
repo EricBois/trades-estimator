@@ -1,18 +1,33 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { Calculator, Edit2, ChevronRight } from "lucide-react";
+import { Calculator, Edit2 } from "lucide-react";
 import { useWizardData } from "./WizardDataContext";
+import { useWizardFooter } from "./WizardFooterContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { calculateEstimateRange, formatCurrency } from "@/lib/estimateCalculations";
+import {
+  calculateEstimateRange,
+  formatCurrency,
+} from "@/lib/estimateCalculations";
 import { WIZARD_TRADE_TYPES, WIZARD_COMPLEXITY_LEVELS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
 
 export function EstimatePreview() {
   const { nextStep, goToStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { tradeType, template, parameters, complexity } = useWizardData();
   const { profile } = useAuth();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Send to Homeowner",
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   // Calculate estimate range
   const estimateRange = useMemo(() => {
@@ -25,8 +40,11 @@ export function EstimatePreview() {
   }, [template, parameters, complexity, profile?.hourly_rate]);
 
   // Get display values
-  const tradeLabel = WIZARD_TRADE_TYPES.find((t) => t.value === tradeType)?.label ?? tradeType;
-  const complexityLabel = WIZARD_COMPLEXITY_LEVELS.find((c) => c.value === complexity)?.label ?? complexity;
+  const tradeLabel =
+    WIZARD_TRADE_TYPES.find((t) => t.value === tradeType)?.label ?? tradeType;
+  const complexityLabel =
+    WIZARD_COMPLEXITY_LEVELS.find((c) => c.value === complexity)?.label ??
+    complexity;
 
   // Format parameters for display
   const parameterSummary = useMemo(() => {
@@ -34,7 +52,10 @@ export function EstimatePreview() {
       .filter(([, value]) => value !== "" && value !== undefined)
       .map(([key, value]) => {
         // Format key from snake_case to Title Case
-        const label = key.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        const label = key
+          .split("_")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
         return `${label}: ${value}`;
       })
       .join(" • ");
@@ -85,7 +106,9 @@ export function EstimatePreview() {
         <div className="flex items-center justify-between p-4">
           <div>
             <p className="text-sm text-gray-500">Template</p>
-            <p className="font-medium text-gray-900">{template?.templateName ?? "None"}</p>
+            <p className="font-medium text-gray-900">
+              {template?.templateName ?? "None"}
+            </p>
           </div>
           <button
             onClick={() => goToStep(1)}
@@ -99,7 +122,9 @@ export function EstimatePreview() {
           <div className="flex items-center justify-between p-4">
             <div className="flex-1 min-w-0 mr-2">
               <p className="text-sm text-gray-500">Details</p>
-              <p className="font-medium text-gray-900 truncate">{parameterSummary}</p>
+              <p className="font-medium text-gray-900 truncate">
+                {parameterSummary}
+              </p>
             </div>
             <button
               onClick={() => goToStep(2)}
@@ -123,21 +148,6 @@ export function EstimatePreview() {
           </button>
         </div>
       </div>
-
-      {/* Continue Button */}
-      <button
-        onClick={nextStep}
-        className={cn(
-          "w-full flex items-center justify-center gap-2",
-          "min-h-[60px] px-6",
-          "bg-blue-600 text-white rounded-xl",
-          "hover:bg-blue-700 active:scale-[0.98]",
-          "transition-all font-medium text-lg"
-        )}
-      >
-        Send to Homeowner
-        <ChevronRight className="w-5 h-5" />
-      </button>
     </div>
   );
 }

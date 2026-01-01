@@ -1,4 +1,10 @@
-import { HangingRoom, HangingOpening, DrywallSheetSize } from "./types";
+import {
+  HangingRoom,
+  HangingOpening,
+  DrywallSheetSize,
+  LShapeDimensions,
+  WallSegment,
+} from "./types";
 import { getSheetSize } from "./constants";
 
 /**
@@ -19,6 +25,110 @@ export function calculateOpeningSqft(
 }
 
 /**
+ * Calculate L-shape wall area
+ * L-shape has 6 walls when viewed from above
+ */
+export function calculateLShapeWalls(
+  dims: LShapeDimensions,
+  heightFeet: number,
+  heightInches: number
+): number {
+  const height = feetInchesToFeet(heightFeet, heightInches);
+  const mainLength = feetInchesToFeet(
+    dims.mainLengthFeet,
+    dims.mainLengthInches
+  );
+  const mainWidth = feetInchesToFeet(dims.mainWidthFeet, dims.mainWidthInches);
+  const extLength = feetInchesToFeet(dims.extLengthFeet, dims.extLengthInches);
+  const extWidth = feetInchesToFeet(dims.extWidthFeet, dims.extWidthInches);
+
+  // L-shape perimeter calculation:
+  // Outer walls: mainLength + mainWidth + extLength + extWidth
+  // Inner walls (the corner): (mainWidth - extWidth) + (mainLength - extLength)
+  // But this simplifies to: 2*(mainLength + mainWidth + extLength + extWidth) - 2*min overlap
+  // Actually, for an L-shape: perimeter = 2*mainLength + 2*extWidth + 2*abs(mainWidth - extWidth) + 2*abs(mainLength - extLength)
+  // Simpler: perimeter = 2*(mainLength + mainWidth) + 2*(extLength + extWidth) - 2*overlap
+  // Where overlap = min(mainWidth, extWidth) + min(mainLength, extLength) but only one applies
+
+  // Clearer calculation: sum of all 6 wall lengths
+  // Wall 1: mainLength (full length of main section)
+  // Wall 2: mainWidth (full width of main section)
+  // Wall 3: extLength (extension length)
+  // Wall 4: extWidth (extension width)
+  // Wall 5: mainWidth - extWidth (inner corner, horizontal part)
+  // Wall 6: mainLength - extLength (inner corner, vertical part)
+  const wall1 = mainLength;
+  const wall2 = mainWidth;
+  const wall3 = extLength;
+  const wall4 = extWidth;
+  const wall5 = Math.max(0, mainWidth - extWidth);
+  const wall6 = Math.max(0, mainLength - extLength);
+
+  const perimeter = wall1 + wall2 + wall3 + wall4 + wall5 + wall6;
+  return perimeter * height;
+}
+
+/**
+ * Calculate L-shape ceiling area
+ */
+export function calculateLShapeCeiling(dims: LShapeDimensions): number {
+  const mainLength = feetInchesToFeet(
+    dims.mainLengthFeet,
+    dims.mainLengthInches
+  );
+  const mainWidth = feetInchesToFeet(dims.mainWidthFeet, dims.mainWidthInches);
+  const extLength = feetInchesToFeet(dims.extLengthFeet, dims.extLengthInches);
+  const extWidth = feetInchesToFeet(dims.extWidthFeet, dims.extWidthInches);
+
+  // L-shape area = main rectangle + extension rectangle - overlap
+  // For proper L-shape, extension overlaps with main section
+  const mainArea = mainLength * mainWidth;
+  const extArea = extLength * extWidth;
+
+  // The extension is positioned at corner, so we add without overlap
+  // (assuming extension dimensions are additional, not including main)
+  return mainArea + extArea;
+}
+
+/**
+ * Calculate custom walls total sqft
+ */
+export function calculateCustomWallsSqft(
+  walls: WallSegment[],
+  heightFeet: number,
+  heightInches: number
+): number {
+  const height = feetInchesToFeet(heightFeet, heightInches);
+
+  return walls.reduce((sum, wall) => {
+    const wallLength = feetInchesToFeet(wall.lengthFeet, wall.lengthInches);
+    return sum + wallLength * height;
+  }, 0);
+}
+
+/**
+ * Calculate rectangular room walls
+ */
+function calculateRectangularWalls(
+  lengthFeet: number,
+  lengthInches: number,
+  widthFeet: number,
+  widthInches: number,
+  heightFeet: number,
+  heightInches: number
+): { wallArea: number; ceilingArea: number } {
+  const length = feetInchesToFeet(lengthFeet, lengthInches);
+  const width = feetInchesToFeet(widthFeet, widthInches);
+  const height = feetInchesToFeet(heightFeet, heightInches);
+
+  const perimeter = 2 * (length + width);
+  const wallArea = perimeter * height;
+  const ceilingArea = length * width;
+
+  return { wallArea, ceilingArea };
+}
+
+/**
  * Calculate room square footage (walls + optional ceiling - openings)
  */
 export function calculateRoomSqft(room: HangingRoom): {
@@ -27,17 +137,57 @@ export function calculateRoomSqft(room: HangingRoom): {
   openingsSqft: number;
   totalSqft: number;
 } {
-  // Convert dimensions to feet
-  const length = feetInchesToFeet(room.lengthFeet, room.lengthInches);
-  const width = feetInchesToFeet(room.widthFeet, room.widthInches);
-  const height = feetInchesToFeet(room.heightFeet, room.heightInches);
+  let wallArea = 0;
+  let ceilingArea = 0;
 
-  // Wall area = perimeter × height
-  const perimeter = 2 * (length + width);
-  const wallArea = perimeter * height;
+  const shape = room.shape || "rectangular";
 
-  // Ceiling area (if included)
-  const ceilingArea = room.includeCeiling ? length * width : 0;
+  switch (shape) {
+    case "l_shape": {
+      if (room.lShapeDimensions) {
+        wallArea = calculateLShapeWalls(
+          room.lShapeDimensions,
+          room.heightFeet,
+          room.heightInches
+        );
+        if (room.includeCeiling) {
+          ceilingArea = calculateLShapeCeiling(room.lShapeDimensions);
+        }
+      }
+      break;
+    }
+
+    case "custom": {
+      if (room.customWalls && room.customWalls.length > 0) {
+        wallArea = calculateCustomWallsSqft(
+          room.customWalls,
+          room.heightFeet,
+          room.heightInches
+        );
+      }
+      if (room.includeCeiling && room.customCeilingSqft !== undefined) {
+        ceilingArea = room.customCeilingSqft;
+      }
+      break;
+    }
+
+    case "rectangular":
+    default: {
+      const result = calculateRectangularWalls(
+        room.lengthFeet,
+        room.lengthInches,
+        room.widthFeet,
+        room.widthInches,
+        room.heightFeet,
+        room.heightInches
+      );
+      wallArea = result.wallArea;
+      if (room.includeCeiling) {
+        ceilingArea = result.ceilingArea;
+      }
+      break;
+    }
+  }
 
   // Total openings sqft
   const doorsSqft = room.doors.reduce((sum, d) => sum + d.totalSqft, 0);

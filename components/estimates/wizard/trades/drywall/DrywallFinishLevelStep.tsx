@@ -1,15 +1,30 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Layers } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useWizardFooter } from "../../WizardFooterContext";
 import { DRYWALL_FINISH_LEVELS } from "@/lib/trades/drywallFinishing/constants";
 import { DrywallFinishLevel } from "@/lib/trades/drywallFinishing/types";
 import { cn } from "@/lib/utils";
 
 export function DrywallFinishLevelStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { finishLevel, setFinishLevel } = useDrywallEstimate();
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: !finishLevel,
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue, finishLevel]);
 
   const handleSelect = (level: DrywallFinishLevel) => {
     setFinishLevel(level);
@@ -51,7 +66,9 @@ export function DrywallFinishLevelStep() {
               <Layers
                 className={cn(
                   "w-6 h-6",
-                  finishLevel === level.value ? "text-blue-600" : "text-gray-500"
+                  finishLevel === level.value
+                    ? "text-blue-600"
+                    : "text-gray-500"
                 )}
               />
             </div>
@@ -59,9 +76,7 @@ export function DrywallFinishLevelStep() {
               <h3 className="text-lg font-medium text-gray-900">
                 {level.label}
               </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {level.description}
-              </p>
+              <p className="text-sm text-gray-500 mt-1">{level.description}</p>
               <p className="text-xs text-gray-400 mt-1">
                 ~${level.sqftRate.toFixed(2)}/sqft base rate
               </p>

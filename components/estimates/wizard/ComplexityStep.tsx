@@ -1,14 +1,32 @@
 "use client";
 
+import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Check } from "lucide-react";
 import { useWizardData } from "./WizardDataContext";
-import { WIZARD_COMPLEXITY_LEVELS, COMPLEXITY_DESCRIPTIONS } from "@/lib/constants";
+import { useWizardFooter } from "./WizardFooterContext";
+import {
+  WIZARD_COMPLEXITY_LEVELS,
+  COMPLEXITY_DESCRIPTIONS,
+} from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export function ComplexityStep() {
   const { nextStep } = useWizard();
+  const { setFooterConfig } = useWizardFooter();
   const { complexity, updateData } = useWizardData();
+
+  // Configure footer (Continue is disabled since user must select a complexity)
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: true, // Selecting a complexity auto-navigates
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   const handleSelect = (complexityValue: string) => {
     updateData({ complexity: complexityValue });
@@ -47,9 +65,7 @@ export function ComplexityStep() {
               <div
                 className={cn(
                   "w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5",
-                  isSelected
-                    ? "border-blue-500 bg-blue-500"
-                    : "border-gray-300"
+                  isSelected ? "border-blue-500 bg-blue-500" : "border-gray-300"
                 )}
               >
                 {isSelected && <Check className="w-4 h-4 text-white" />}

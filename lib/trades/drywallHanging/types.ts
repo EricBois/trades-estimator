@@ -10,7 +10,7 @@ import {
 } from "@/hooks/useProfile";
 
 // Input mode
-export type HangingInputMode = "calculator" | "direct";
+export type HangingInputMode = "calculator" | "direct" | "labor_only";
 
 // Pricing method
 export type HangingPricingMethod = "per_sheet" | "per_sqft";
@@ -31,6 +31,32 @@ export type HangingAddonId = (typeof HANGING_ADDONS)[number]["id"];
 // Complexity levels
 export type HangingComplexity = "simple" | "standard" | "complex";
 
+// Room shape
+export type RoomShape = "rectangular" | "l_shape" | "custom";
+
+// Wall segment for custom rooms
+export interface WallSegment {
+  id: string;
+  lengthFeet: number;
+  lengthInches: number;
+  label: string;
+  sqft: number; // calculated
+}
+
+// L-shape dimensions
+export interface LShapeDimensions {
+  // Main section
+  mainLengthFeet: number;
+  mainLengthInches: number;
+  mainWidthFeet: number;
+  mainWidthInches: number;
+  // Extension section
+  extLengthFeet: number;
+  extLengthInches: number;
+  extWidthFeet: number;
+  extWidthInches: number;
+}
+
 // Opening (door/window)
 export interface HangingOpening {
   id: string;
@@ -47,12 +73,20 @@ export interface HangingOpening {
 export interface HangingRoom {
   id: string;
   name: string;
+  shape: RoomShape;
+  // Rectangular dimensions (used when shape="rectangular")
   lengthFeet: number;
   lengthInches: number;
   widthFeet: number;
   widthInches: number;
   heightFeet: number;
   heightInches: number;
+  // L-shape dimensions (used when shape="l_shape")
+  lShapeDimensions?: LShapeDimensions;
+  // Custom walls (used when shape="custom")
+  customWalls: WallSegment[];
+  customCeilingSqft?: number;
+  // Common fields
   includeCeiling: boolean;
   doors: HangingOpening[];
   windows: HangingOpening[];
@@ -69,10 +103,16 @@ export interface HangingSheetEntry {
   typeId: DrywallSheetTypeId;
   size: DrywallSheetSize;
   quantity: number;
-  materialCost: number; // per sheet
-  laborCost: number; // per sheet
+  materialCost: number; // per sheet (base calculated cost)
+  laborCost: number; // per sheet (base calculated cost)
   totalPerSheet: number;
   subtotal: number;
+  // Material toggle
+  includeMaterial: boolean;
+  // Override fields
+  materialCostOverride?: number;
+  laborCostOverride?: number;
+  hasOverride: boolean;
 }
 
 // Addon selection
@@ -80,12 +120,17 @@ export interface HangingSelectedAddon {
   id: HangingAddonId;
   quantity: number;
   total: number;
+  // Override fields
+  priceOverride?: number;
+  hasOverride: boolean;
 }
 
 // Complete estimate data
 export interface DrywallHangingEstimateData {
   inputMode: HangingInputMode;
   pricingMethod: HangingPricingMethod;
+  clientSuppliesMaterials: boolean; // When true, all sheets labor-only
+  directSqft: number; // For labor_only mode - direct sqft entry
   rooms: HangingRoom[];
   sheets: HangingSheetEntry[];
   ceilingFactor: CeilingHeightFactor;
@@ -115,6 +160,8 @@ export interface DrywallHangingEstimateActions {
   // Mode & pricing
   setInputMode: (mode: HangingInputMode) => void;
   setPricingMethod: (method: HangingPricingMethod) => void;
+  setClientSuppliesMaterials: (value: boolean) => void;
+  setDirectSqft: (sqft: number) => void;
   // Room management (calculator mode)
   addRoom: (name?: string) => string;
   updateRoom: (
@@ -127,6 +174,14 @@ export interface DrywallHangingEstimateActions {
     >
   ) => void;
   removeRoom: (id: string) => void;
+  // Custom wall management
+  addCustomWall: (roomId: string) => void;
+  updateCustomWall: (
+    roomId: string,
+    wallId: string,
+    updates: Partial<Omit<WallSegment, "id" | "sqft">>
+  ) => void;
+  removeCustomWall: (roomId: string, wallId: string) => void;
   // Opening management
   addOpening: (
     roomId: string,
@@ -162,6 +217,8 @@ export interface DrywallHangingEstimateActions {
   ) => void;
   removeSheet: (id: string) => void;
   calculateSheetsFromRooms: () => void;
+  // Set sqft directly (for project wizard integration)
+  setSqft: (totalSqft: number) => void;
   // Settings
   setCeilingFactor: (factor: CeilingHeightFactor) => void;
   setWasteFactor: (factor: number) => void;
@@ -170,6 +227,17 @@ export interface DrywallHangingEstimateActions {
   toggleAddon: (addonId: HangingAddonId, quantity?: number) => void;
   updateAddonQuantity: (addonId: HangingAddonId, quantity: number) => void;
   removeAddon: (addonId: HangingAddonId) => void;
+  // Material toggle and overrides
+  setSheetIncludeMaterial: (id: string, include: boolean) => void;
+  setSheetMaterialCostOverride: (
+    id: string,
+    override: number | undefined
+  ) => void;
+  setSheetLaborCostOverride: (id: string, override: number | undefined) => void;
+  setAddonPriceOverride: (
+    addonId: HangingAddonId,
+    override: number | undefined
+  ) => void;
   // Reset
   reset: () => void;
 }
