@@ -103,10 +103,16 @@ export interface HangingSheetEntry {
   typeId: DrywallSheetTypeId;
   size: DrywallSheetSize;
   quantity: number;
-  materialCost: number; // per sheet
-  laborCost: number; // per sheet
+  materialCost: number; // per sheet (base calculated cost)
+  laborCost: number; // per sheet (base calculated cost)
   totalPerSheet: number;
   subtotal: number;
+  // Material toggle
+  includeMaterial: boolean;
+  // Override fields
+  materialCostOverride?: number;
+  laborCostOverride?: number;
+  hasOverride: boolean;
 }
 
 // Addon selection
@@ -114,6 +120,9 @@ export interface HangingSelectedAddon {
   id: HangingAddonId;
   quantity: number;
   total: number;
+  // Override fields
+  priceOverride?: number;
+  hasOverride: boolean;
 }
 
 // Complete estimate data
@@ -214,6 +223,17 @@ export interface DrywallHangingEstimateActions {
   toggleAddon: (addonId: HangingAddonId, quantity?: number) => void;
   updateAddonQuantity: (addonId: HangingAddonId, quantity: number) => void;
   removeAddon: (addonId: HangingAddonId) => void;
+  // Material toggle and overrides
+  setSheetIncludeMaterial: (id: string, include: boolean) => void;
+  setSheetMaterialCostOverride: (
+    id: string,
+    override: number | undefined
+  ) => void;
+  setSheetLaborCostOverride: (id: string, override: number | undefined) => void;
+  setAddonPriceOverride: (
+    addonId: HangingAddonId,
+    override: number | undefined
+  ) => void;
   // Reset
   reset: () => void;
 }

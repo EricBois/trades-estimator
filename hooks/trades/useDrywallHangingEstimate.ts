@@ -384,6 +384,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         laborCost,
         totalPerSheet,
         subtotal: totalPerSheet * quantity,
+        includeMaterial: true,
+        materialCostOverride: undefined,
+        laborCostOverride: undefined,
+        hasOverride: false,
       };
 
       setSheets((prev) => [...prev, newSheet]);
@@ -410,9 +414,19 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
               customRates
             );
             updated.laborCost = getSheetLaborCost(updates.typeId, customRates);
+            // Clear overrides when type changes
+            updated.materialCostOverride = undefined;
+            updated.laborCostOverride = undefined;
+            updated.hasOverride = false;
           }
 
-          updated.totalPerSheet = updated.materialCost + updated.laborCost;
+          // Calculate effective costs (respecting overrides and material toggle)
+          const effectiveMaterial = updated.includeMaterial
+            ? updated.materialCostOverride ?? updated.materialCost
+            : 0;
+          const effectiveLabor = updated.laborCostOverride ?? updated.laborCost;
+
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
           updated.subtotal = updated.totalPerSheet * updated.quantity;
           return updated;
         })
@@ -465,6 +479,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
           laborCost,
           totalPerSheet,
           subtotal: totalPerSheet * sheetsNeeded,
+          includeMaterial: currentSheet?.includeMaterial ?? true,
+          materialCostOverride: currentSheet?.materialCostOverride,
+          laborCostOverride: currentSheet?.laborCostOverride,
+          hasOverride: currentSheet?.hasOverride ?? false,
         },
       ];
     });
@@ -508,6 +526,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
             laborCost,
             totalPerSheet,
             subtotal: totalPerSheet * sheetsNeeded,
+            includeMaterial: currentSheet?.includeMaterial ?? true,
+            materialCostOverride: currentSheet?.materialCostOverride,
+            laborCostOverride: currentSheet?.laborCostOverride,
+            hasOverride: currentSheet?.hasOverride ?? false,
           },
         ];
       });
@@ -531,7 +553,16 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         const price = getUserHangingAddonPrice(addonId, customRates);
         const total = addonDef.unit === "flat" ? price : price * quantity;
 
-        return [...prev, { id: addonId, quantity, total }];
+        return [
+          ...prev,
+          {
+            id: addonId,
+            quantity,
+            total,
+            priceOverride: undefined,
+            hasOverride: false,
+          },
+        ];
       });
     },
     [customRates]
@@ -558,6 +589,103 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
   const removeAddon = useCallback((addonId: HangingAddonId) => {
     setAddons((prev) => prev.filter((a) => a.id !== addonId));
   }, []);
+
+  // Material toggle and override actions
+  const setSheetIncludeMaterial = useCallback(
+    (id: string, include: boolean) => {
+      setSheets((prev) =>
+        prev.map((sheet) => {
+          if (sheet.id !== id) return sheet;
+          const updated = { ...sheet, includeMaterial: include };
+          // Recalculate totals
+          const effectiveMaterial = include
+            ? updated.materialCostOverride ?? updated.materialCost
+            : 0;
+          const effectiveLabor = updated.laborCostOverride ?? updated.laborCost;
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+          updated.subtotal = updated.totalPerSheet * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setSheetMaterialCostOverride = useCallback(
+    (id: string, override: number | undefined) => {
+      setSheets((prev) =>
+        prev.map((sheet) => {
+          if (sheet.id !== id) return sheet;
+          const updated = {
+            ...sheet,
+            materialCostOverride: override,
+            hasOverride:
+              override !== undefined || sheet.laborCostOverride !== undefined,
+          };
+          // Recalculate totals
+          const effectiveMaterial = updated.includeMaterial
+            ? override ?? sheet.materialCost
+            : 0;
+          const effectiveLabor = updated.laborCostOverride ?? sheet.laborCost;
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+          updated.subtotal = updated.totalPerSheet * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setSheetLaborCostOverride = useCallback(
+    (id: string, override: number | undefined) => {
+      setSheets((prev) =>
+        prev.map((sheet) => {
+          if (sheet.id !== id) return sheet;
+          const updated = {
+            ...sheet,
+            laborCostOverride: override,
+            hasOverride:
+              sheet.materialCostOverride !== undefined ||
+              override !== undefined,
+          };
+          // Recalculate totals
+          const effectiveMaterial = updated.includeMaterial
+            ? sheet.materialCostOverride ?? sheet.materialCost
+            : 0;
+          const effectiveLabor = override ?? sheet.laborCost;
+          updated.totalPerSheet = effectiveMaterial + effectiveLabor;
+          updated.subtotal = updated.totalPerSheet * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setAddonPriceOverride = useCallback(
+    (addonId: HangingAddonId, override: number | undefined) => {
+      setAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== addonId) return addon;
+          const addonDef = HANGING_ADDONS.find((a) => a.id === addonId);
+          if (!addonDef) return addon;
+
+          const price =
+            override ?? getUserHangingAddonPrice(addonId, customRates);
+          const total =
+            addonDef.unit === "flat" ? price : price * addon.quantity;
+
+          return {
+            ...addon,
+            priceOverride: override,
+            hasOverride: override !== undefined,
+            total,
+          };
+        })
+      );
+    },
+    [customRates]
+  );
 
   // Reset all state
   const reset = useCallback(() => {
@@ -586,18 +714,21 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     // Total sheets
     const sheetsNeeded = sheets.reduce((sum, s) => sum + s.quantity, 0);
 
-    // Material subtotal
-    const materialSubtotal = sheets.reduce(
-      (sum, s) => sum + s.materialCost * s.quantity,
-      0
-    );
+    // Material subtotal (respect includeMaterial flag and overrides)
+    const materialSubtotal = sheets.reduce((sum, s) => {
+      if (!s.includeMaterial) return sum;
+      const effectiveCost = s.materialCostOverride ?? s.materialCost;
+      return sum + effectiveCost * s.quantity;
+    }, 0);
 
-    // Labor subtotal (apply ceiling factor)
+    // Labor subtotal (apply ceiling factor, respect overrides)
     const ceilingFactorInfo = getCeilingFactor(ceilingFactor);
     const ceilingMultiplier = ceilingFactorInfo?.multiplier ?? 1;
     const laborSubtotal =
-      sheets.reduce((sum, s) => sum + s.laborCost * s.quantity, 0) *
-      ceilingMultiplier;
+      sheets.reduce((sum, s) => {
+        const effectiveCost = s.laborCostOverride ?? s.laborCost;
+        return sum + effectiveCost * s.quantity;
+      }, 0) * ceilingMultiplier;
 
     // Addons subtotal
     const addonsSubtotal = addons.reduce((sum, a) => sum + a.total, 0);
@@ -669,6 +800,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     toggleAddon,
     updateAddonQuantity,
     removeAddon,
+    setSheetIncludeMaterial,
+    setSheetMaterialCostOverride,
+    setSheetLaborCostOverride,
+    setAddonPriceOverride,
     reset,
   };
 }

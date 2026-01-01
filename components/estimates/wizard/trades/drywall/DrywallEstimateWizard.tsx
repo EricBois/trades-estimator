@@ -7,6 +7,7 @@ import { DrywallEstimateProvider } from "./DrywallEstimateContext";
 import { DrywallFinishLevelStep } from "./DrywallFinishLevelStep";
 import { DrywallLineItemsStep } from "./DrywallLineItemsStep";
 import { DrywallAddonsStep } from "./DrywallAddonsStep";
+import { DrywallMaterialsStep } from "./DrywallMaterialsStep";
 import { DrywallComplexityStep } from "./DrywallComplexityStep";
 import { DrywallPreview } from "./DrywallPreview";
 import { DrywallSendEstimate } from "./DrywallSendEstimate";
@@ -16,6 +17,7 @@ const DRYWALL_STEPS = [
   { label: "Finish Level" },
   { label: "Line Items" },
   { label: "Add-ons" },
+  { label: "Materials" },
   { label: "Complexity" },
   { label: "Preview" },
   { label: "Send" },
@@ -35,6 +37,7 @@ export function DrywallEstimateWizard() {
           <DrywallFinishLevelStep />
           <DrywallLineItemsStep />
           <DrywallAddonsStep />
+          <DrywallMaterialsStep />
           <DrywallComplexityStep />
           <DrywallPreview />
           <DrywallSendEstimate />

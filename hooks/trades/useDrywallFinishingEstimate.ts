@@ -5,20 +5,24 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   DRYWALL_ADDONS,
   DRYWALL_COMPLEXITY_MULTIPLIERS,
-  DRYWALL_FINISH_LEVELS,
-  getRateRange,
+  getFinishingMaterial,
 } from "@/lib/trades/drywallFinishing/constants";
 import {
-  getUserDrywallRate,
   getUserDrywallRates,
   getUserAddonPrice,
   getUserAddonPrices,
+  getUserMaterialRate,
+  getUserLaborRate,
   DrywallRateType,
 } from "@/lib/trades/drywallFinishing/rates";
+import { getMaterialLaborRateRanges } from "@/lib/trades/drywallFinishing/constants";
 import { CustomRates } from "@/hooks/useProfile";
 import {
   DrywallLineItem,
   DrywallSelectedAddon,
+  FinishingMaterialEntry,
+  FinishingMaterialId,
+  FinishingMaterialCategory,
   DrywallFinishLevel,
   DrywallComplexity,
   DrywallLineItemType,
@@ -39,6 +43,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   const [finishLevel, setFinishLevel] = useState<DrywallFinishLevel>(4);
   const [lineItems, setLineItems] = useState<DrywallLineItem[]>([]);
   const [addons, setAddons] = useState<DrywallSelectedAddon[]>([]);
+  const [materials, setMaterials] = useState<FinishingMaterialEntry[]>([]);
   const [complexity, setComplexity] = useState<DrywallComplexity>("standard");
 
   // Get hourly rate from profile or use default
@@ -59,13 +64,24 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     [customRates]
   );
 
-  // Helper to get the user's rate for a line item type
-  const getRateForType = useCallback(
-    (type: DrywallLineItemType): number => {
-      if (type === "hourly") return hourlyRate;
-      if (type === "addon") return 0;
-      // For sqft and linear types, use user's custom rate or industry default
-      return getUserDrywallRate(type as DrywallRateType, customRates);
+  // Helper to get the user's rates for a line item type
+  const getRatesForType = useCallback(
+    (
+      type: DrywallLineItemType
+    ): { materialRate: number; laborRate: number; rate: number } => {
+      if (type === "hourly") {
+        return { materialRate: 0, laborRate: hourlyRate, rate: hourlyRate };
+      }
+      if (type === "addon") {
+        return { materialRate: 0, laborRate: 0, rate: 0 };
+      }
+      // For sqft and linear types, use material/labor split
+      const materialRate = getUserMaterialRate(
+        type as DrywallRateType,
+        customRates
+      );
+      const laborRate = getUserLaborRate(type as DrywallRateType, customRates);
+      return { materialRate, laborRate, rate: materialRate + laborRate };
     },
     [hourlyRate, customRates]
   );
@@ -73,29 +89,60 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   // Add a new line item
   const addLineItem = useCallback(
     (type: DrywallLineItemType) => {
-      const rate = getRateForType(type);
+      const { materialRate, laborRate, rate } = getRatesForType(type);
+      const defaultQty = type === "hourly" ? 1 : 100;
+      const materialTotal = materialRate * defaultQty;
+      const laborTotal = laborRate * defaultQty;
+
       const newItem: DrywallLineItem = {
         id: generateId(),
         type,
         description: "",
-        quantity: type === "hourly" ? 1 : 100, // Default 1 hour or 100 sqft
+        quantity: defaultQty,
+        materialRate,
+        laborRate,
         rate,
-        total: type === "hourly" ? rate : rate * 100,
+        includeMaterial: true,
+        materialRateOverride: undefined,
+        laborRateOverride: undefined,
+        hasOverride: false,
+        materialTotal,
+        laborTotal,
+        total: materialTotal + laborTotal,
       };
       setLineItems((prev) => [...prev, newItem]);
     },
-    [getRateForType]
+    [getRatesForType]
   );
 
   // Update a line item
   const updateLineItem = useCallback(
-    (id: string, updates: Partial<Omit<DrywallLineItem, "id" | "total">>) => {
+    (
+      id: string,
+      updates: Partial<
+        Omit<DrywallLineItem, "id" | "total" | "materialTotal" | "laborTotal">
+      >
+    ) => {
       setLineItems((prev) =>
         prev.map((item) => {
           if (item.id !== id) return item;
           const updated = { ...item, ...updates };
-          // Recalculate total
-          updated.total = updated.quantity * updated.rate;
+
+          // Calculate effective rates
+          const effectiveMaterialRate =
+            updated.materialRateOverride ?? updated.materialRate;
+          const effectiveLaborRate =
+            updated.laborRateOverride ?? updated.laborRate;
+          updated.rate =
+            (updated.includeMaterial ? effectiveMaterialRate : 0) +
+            effectiveLaborRate;
+
+          // Recalculate totals
+          updated.materialTotal = updated.includeMaterial
+            ? effectiveMaterialRate * updated.quantity
+            : 0;
+          updated.laborTotal = effectiveLaborRate * updated.quantity;
+          updated.total = updated.materialTotal + updated.laborTotal;
           return updated;
         })
       );
@@ -169,11 +216,9 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
         return;
       }
 
-      // Get rate from finish level
-      const finishLevelInfo = DRYWALL_FINISH_LEVELS.find(
-        (l) => l.value === finishLevel
-      );
-      const rate = finishLevelInfo?.sqftRate ?? 0.55; // Default to level 4 rate
+      // Get rates (material/labor split)
+      const { materialRate, laborRate, rate } =
+        getRatesForType("sqft_standard");
 
       // Create or update a sqft_standard line item
       setLineItems((prev) => {
@@ -184,30 +229,206 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
         );
 
         if (existingIndex >= 0) {
-          // Update existing
+          // Update existing - preserve material toggle and overrides
+          const existing = prev[existingIndex];
           const updated = [...prev];
+          const effectiveMaterialRate =
+            existing.materialRateOverride ?? materialRate;
+          const effectiveLaborRate = existing.laborRateOverride ?? laborRate;
+          const materialTotal = existing.includeMaterial
+            ? effectiveMaterialRate * totalSqft
+            : 0;
+          const laborTotal = effectiveLaborRate * totalSqft;
+
           updated[existingIndex] = {
-            ...updated[existingIndex],
+            ...existing,
             quantity: totalSqft,
-            rate,
-            total: totalSqft * rate,
+            materialRate,
+            laborRate,
+            rate:
+              (existing.includeMaterial ? effectiveMaterialRate : 0) +
+              effectiveLaborRate,
+            materialTotal,
+            laborTotal,
+            total: materialTotal + laborTotal,
           };
           return updated;
         }
 
         // Create new sqft line item
+        const materialTotal = materialRate * totalSqft;
+        const laborTotal = laborRate * totalSqft;
         const newItem: DrywallLineItem = {
           id: generateId(),
           type: "sqft_standard",
           description: "Wall & Ceiling Finishing",
           quantity: totalSqft,
+          materialRate,
+          laborRate,
           rate,
-          total: totalSqft * rate,
+          includeMaterial: true,
+          materialRateOverride: undefined,
+          laborRateOverride: undefined,
+          hasOverride: false,
+          materialTotal,
+          laborTotal,
+          total: materialTotal + laborTotal,
         };
         return [newItem, ...prev];
       });
     },
-    [finishLevel]
+    [getRatesForType]
+  );
+
+  // Material toggle and override actions
+  const setLineItemIncludeMaterial = useCallback(
+    (id: string, include: boolean) => {
+      setLineItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          const updated = { ...item, includeMaterial: include };
+          // Recalculate totals
+          const effectiveMaterialRate =
+            updated.materialRateOverride ?? updated.materialRate;
+          const effectiveLaborRate =
+            updated.laborRateOverride ?? updated.laborRate;
+          updated.rate =
+            (include ? effectiveMaterialRate : 0) + effectiveLaborRate;
+          updated.materialTotal = include
+            ? effectiveMaterialRate * updated.quantity
+            : 0;
+          updated.laborTotal = effectiveLaborRate * updated.quantity;
+          updated.total = updated.materialTotal + updated.laborTotal;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setLineItemMaterialOverride = useCallback(
+    (id: string, override: number | undefined) => {
+      setLineItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          const updated = {
+            ...item,
+            materialRateOverride: override,
+            hasOverride:
+              override !== undefined || item.laborRateOverride !== undefined,
+          };
+          // Recalculate totals
+          const effectiveMaterialRate = override ?? item.materialRate;
+          const effectiveLaborRate =
+            updated.laborRateOverride ?? item.laborRate;
+          updated.rate =
+            (updated.includeMaterial ? effectiveMaterialRate : 0) +
+            effectiveLaborRate;
+          updated.materialTotal = updated.includeMaterial
+            ? effectiveMaterialRate * updated.quantity
+            : 0;
+          updated.laborTotal = effectiveLaborRate * updated.quantity;
+          updated.total = updated.materialTotal + updated.laborTotal;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const setLineItemLaborOverride = useCallback(
+    (id: string, override: number | undefined) => {
+      setLineItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          const updated = {
+            ...item,
+            laborRateOverride: override,
+            hasOverride:
+              item.materialRateOverride !== undefined || override !== undefined,
+          };
+          // Recalculate totals
+          const effectiveMaterialRate =
+            item.materialRateOverride ?? item.materialRate;
+          const effectiveLaborRate = override ?? item.laborRate;
+          updated.rate =
+            (updated.includeMaterial ? effectiveMaterialRate : 0) +
+            effectiveLaborRate;
+          updated.materialTotal = updated.includeMaterial
+            ? effectiveMaterialRate * updated.quantity
+            : 0;
+          updated.laborTotal = effectiveLaborRate * updated.quantity;
+          updated.total = updated.materialTotal + updated.laborTotal;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  // Material management actions
+  const addMaterial = useCallback(
+    (materialId: FinishingMaterialId, quantity: number = 1) => {
+      const materialDef = getFinishingMaterial(materialId);
+      if (!materialDef) return;
+
+      const unitPrice = materialDef.price;
+      const newEntry: FinishingMaterialEntry = {
+        id: generateId(),
+        materialId,
+        category: materialDef.category as FinishingMaterialCategory,
+        quantity,
+        unitPrice,
+        priceOverride: undefined,
+        hasOverride: false,
+        subtotal: unitPrice * quantity,
+      };
+      setMaterials((prev) => [...prev, newEntry]);
+    },
+    []
+  );
+
+  const updateMaterial = useCallback(
+    (
+      id: string,
+      updates: Partial<Omit<FinishingMaterialEntry, "id" | "subtotal">>
+    ) => {
+      setMaterials((prev) =>
+        prev.map((entry) => {
+          if (entry.id !== id) return entry;
+          const updated = { ...entry, ...updates };
+          // Recalculate subtotal
+          const effectivePrice = updated.priceOverride ?? updated.unitPrice;
+          updated.subtotal = effectivePrice * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const removeMaterial = useCallback((id: string) => {
+    setMaterials((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
+
+  const setMaterialPriceOverride = useCallback(
+    (id: string, override: number | undefined) => {
+      setMaterials((prev) =>
+        prev.map((entry) => {
+          if (entry.id !== id) return entry;
+          const updated = {
+            ...entry,
+            priceOverride: override,
+            hasOverride: override !== undefined,
+          };
+          // Recalculate subtotal
+          const effectivePrice = override ?? entry.unitPrice;
+          updated.subtotal = effectivePrice * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
   );
 
   // Reset all state
@@ -215,22 +436,34 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     setFinishLevel(4);
     setLineItems([]);
     setAddons([]);
+    setMaterials([]);
     setComplexity("standard");
   }, []);
 
   // Calculate totals
   const totals = useMemo((): DrywallEstimateTotals => {
-    // Line items subtotal
-    const lineItemsSubtotal = lineItems.reduce(
-      (sum, item) => sum + item.total,
+    // Material and labor subtotals (from line items)
+    const materialSubtotal = lineItems.reduce(
+      (sum, item) => sum + item.materialTotal,
       0
     );
+    const laborSubtotal = lineItems.reduce(
+      (sum, item) => sum + item.laborTotal,
+      0
+    );
+    const lineItemsSubtotal = materialSubtotal + laborSubtotal;
 
     // Addons subtotal
     const addonsSubtotal = addons.reduce((sum, addon) => sum + addon.total, 0);
 
-    // Subtotal
-    const subtotal = lineItemsSubtotal + addonsSubtotal;
+    // Manual materials subtotal
+    const materialsSubtotal = materials.reduce(
+      (sum, entry) => sum + entry.subtotal,
+      0
+    );
+
+    // Subtotal (include manual materials)
+    const subtotal = lineItemsSubtotal + addonsSubtotal + materialsSubtotal;
 
     // Complexity adjustment
     const complexityMultiplier = DRYWALL_COMPLEXITY_MULTIPLIERS[complexity];
@@ -239,19 +472,26 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     // Total
     const total = subtotal + complexityAdjustment;
 
-    // Calculate range based on rate ranges
+    // Calculate range based on material/labor rate ranges
     let rangeLow = 0;
     let rangeHigh = 0;
 
     for (const item of lineItems) {
-      const rateRange = getRateRange(item.type);
-      if (rateRange) {
-        rangeLow += item.quantity * rateRange.low;
-        rangeHigh += item.quantity * rateRange.high;
+      const rateRanges = getMaterialLaborRateRanges(item.type);
+      if (rateRanges) {
+        // Use material/labor ranges, respecting includeMaterial
+        const materialLow = item.includeMaterial
+          ? rateRanges.material.low * item.quantity
+          : 0;
+        const materialHigh = item.includeMaterial
+          ? rateRanges.material.high * item.quantity
+          : 0;
+        rangeLow += materialLow + rateRanges.labor.low * item.quantity;
+        rangeHigh += materialHigh + rateRanges.labor.high * item.quantity;
       } else if (item.type === "hourly") {
-        // Hourly has fixed rate from profile
-        rangeLow += item.total;
-        rangeHigh += item.total;
+        // Hourly has fixed rate from profile (labor only)
+        rangeLow += item.laborTotal;
+        rangeHigh += item.laborTotal;
       } else {
         // Unknown type, use actual
         rangeLow += item.total;
@@ -263,13 +503,20 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     rangeLow += addonsSubtotal;
     rangeHigh += addonsSubtotal;
 
+    // Add manual materials to range (fixed pricing)
+    rangeLow += materialsSubtotal;
+    rangeHigh += materialsSubtotal;
+
     // Apply complexity to range
     rangeLow = rangeLow * complexityMultiplier;
     rangeHigh = rangeHigh * complexityMultiplier;
 
     return {
+      materialSubtotal,
+      laborSubtotal,
       lineItemsSubtotal,
       addonsSubtotal,
+      materialsSubtotal,
       subtotal,
       complexityMultiplier,
       complexityAdjustment,
@@ -279,13 +526,14 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
         high: Math.round(rangeHigh),
       },
     };
-  }, [lineItems, addons, complexity]);
+  }, [lineItems, addons, materials, complexity]);
 
   return {
     // Data
     finishLevel,
     lineItems,
     addons,
+    materials,
     complexity,
     totals,
     defaultRates,
@@ -301,6 +549,13 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     updateAddonQuantity,
     setComplexity,
     setSqft,
+    setLineItemIncludeMaterial,
+    setLineItemMaterialOverride,
+    setLineItemLaborOverride,
+    addMaterial,
+    updateMaterial,
+    removeMaterial,
+    setMaterialPriceOverride,
     reset,
   };
 }

@@ -1,11 +1,20 @@
-import { DRYWALL_RATES, DRYWALL_ADDONS } from "./constants";
-import { CustomRates, DrywallFinishingRates, DrywallAddonPrices } from "@/hooks/useProfile";
+import {
+  DRYWALL_RATES,
+  DRYWALL_ADDONS,
+  getMaterialRate,
+  getLaborRate,
+} from "./constants";
+import {
+  CustomRates,
+  DrywallFinishingRates,
+  DrywallAddonPrices,
+} from "@/hooks/useProfile";
 
 // Rate type keys that can be customized
 export type DrywallRateType = keyof typeof DRYWALL_RATES;
 
 // Add-on ID type
-export type DrywallAddonId = typeof DRYWALL_ADDONS[number]["id"];
+export type DrywallAddonId = (typeof DRYWALL_ADDONS)[number]["id"];
 
 /**
  * Get user's custom rate or fall back to industry mid rate
@@ -42,7 +51,8 @@ export function getUserAddonPrice(
   addonId: string,
   customRates: CustomRates | null | undefined
 ): number {
-  const userPrice = customRates?.drywall_addons?.[addonId as keyof DrywallAddonPrices];
+  const userPrice =
+    customRates?.drywall_addons?.[addonId as keyof DrywallAddonPrices];
   if (userPrice !== undefined && userPrice !== null) {
     return userPrice;
   }
@@ -93,7 +103,8 @@ export function isAddonPriceCustomized(
   addonId: string,
   customRates: CustomRates | null | undefined
 ): boolean {
-  const userPrice = customRates?.drywall_addons?.[addonId as keyof DrywallAddonPrices];
+  const userPrice =
+    customRates?.drywall_addons?.[addonId as keyof DrywallAddonPrices];
   return userPrice !== undefined && userPrice !== null;
 }
 
@@ -126,4 +137,64 @@ export function getRateRangeInfo(rateType: DrywallRateType): {
     ...range,
     ...labels[rateType],
   };
+}
+
+/**
+ * Get user's custom material rate for a line item type or fall back to industry default
+ */
+export function getUserMaterialRate(
+  rateType: DrywallRateType,
+  customRates: CustomRates | null | undefined
+): number {
+  // Check if user has custom material rate (future: could add drywall_finishing_material to profile)
+  const userRate = customRates?.drywall_finishing?.[rateType];
+  if (userRate !== undefined && userRate !== null) {
+    // If user has a combined rate, calculate material portion (~30%)
+    return userRate * 0.3;
+  }
+  return getMaterialRate(rateType);
+}
+
+/**
+ * Get user's custom labor rate for a line item type or fall back to industry default
+ */
+export function getUserLaborRate(
+  rateType: DrywallRateType,
+  customRates: CustomRates | null | undefined
+): number {
+  // Check if user has custom labor rate
+  const userRate = customRates?.drywall_finishing?.[rateType];
+  if (userRate !== undefined && userRate !== null) {
+    // If user has a combined rate, calculate labor portion (~70%)
+    return userRate * 0.7;
+  }
+  return getLaborRate(rateType);
+}
+
+/**
+ * Get effective material rate respecting override
+ */
+export function getEffectiveMaterialRate(
+  rateType: DrywallRateType,
+  customRates: CustomRates | null | undefined,
+  override?: number
+): number {
+  if (override !== undefined) {
+    return override;
+  }
+  return getUserMaterialRate(rateType, customRates);
+}
+
+/**
+ * Get effective labor rate respecting override
+ */
+export function getEffectiveLaborRate(
+  rateType: DrywallRateType,
+  customRates: CustomRates | null | undefined,
+  override?: number
+): number {
+  if (override !== undefined) {
+    return override;
+  }
+  return getUserLaborRate(rateType, customRates);
 }
