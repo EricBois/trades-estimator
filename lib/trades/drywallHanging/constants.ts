@@ -183,6 +183,25 @@ export const PRICING_METHODS = [
   },
 ] as const;
 
+// Room shapes
+export const ROOM_SHAPES = [
+  { value: "rectangular", label: "Rectangular", icon: "Square" },
+  { value: "l_shape", label: "L-Shape", icon: "CornerUpRight" },
+  { value: "custom", label: "Custom", icon: "Layers" },
+] as const;
+
+// Default L-shape dimensions
+export const DEFAULT_L_SHAPE_DIMENSIONS = {
+  mainLengthFeet: 12,
+  mainLengthInches: 0,
+  mainWidthFeet: 10,
+  mainWidthInches: 0,
+  extLengthFeet: 8,
+  extLengthInches: 0,
+  extWidthFeet: 6,
+  extWidthInches: 0,
+} as const;
+
 // Industry rate ranges (for settings display)
 export const HANGING_RATES = {
   labor_per_sheet: { low: 8, mid: 12, high: 18 },

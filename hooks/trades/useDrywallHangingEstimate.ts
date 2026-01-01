@@ -39,6 +39,8 @@ import {
   DrywallSheetSize,
   HangingAddonId,
   UseDrywallHangingEstimateReturn,
+  WallSegment,
+  RoomShape,
 } from "@/lib/trades/drywallHanging/types";
 
 // Generate unique ID
@@ -47,16 +49,35 @@ function generateId(): string {
 }
 
 // Create a default room
-function createDefaultRoom(name: string = "Room 1"): HangingRoom {
+function createDefaultRoom(
+  name: string = "Room 1",
+  shape: RoomShape = "rectangular"
+): HangingRoom {
   return {
     id: generateId(),
     name,
+    shape,
     lengthFeet: 12,
     lengthInches: 0,
     widthFeet: 10,
     widthInches: 0,
     heightFeet: 8,
     heightInches: 0,
+    lShapeDimensions:
+      shape === "l_shape"
+        ? {
+            mainLengthFeet: 12,
+            mainLengthInches: 0,
+            mainWidthFeet: 10,
+            mainWidthInches: 0,
+            extLengthFeet: 8,
+            extLengthInches: 0,
+            extWidthFeet: 6,
+            extWidthInches: 0,
+          }
+        : undefined,
+    customWalls: [],
+    customCeilingSqft: undefined,
     includeCeiling: false,
     doors: [],
     windows: [],
@@ -141,6 +162,21 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         prev.map((room) => {
           if (room.id !== id) return room;
           const updatedRoom = { ...room, ...updates };
+
+          // Initialize lShapeDimensions when switching to L-shape
+          if (updates.shape === "l_shape" && !updatedRoom.lShapeDimensions) {
+            updatedRoom.lShapeDimensions = {
+              mainLengthFeet: 12,
+              mainLengthInches: 0,
+              mainWidthFeet: 10,
+              mainWidthInches: 0,
+              extLengthFeet: 8,
+              extLengthInches: 0,
+              extWidthFeet: 6,
+              extWidthInches: 0,
+            };
+          }
+
           return updateRoomCalculations(updatedRoom);
         })
       );
@@ -263,6 +299,71 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     [updateRoomCalculations]
   );
 
+  // Custom wall management
+  const addCustomWall = useCallback(
+    (roomId: string) => {
+      setRooms((prev) =>
+        prev.map((room) => {
+          if (room.id !== roomId) return room;
+          const wallNumber = room.customWalls.length + 1;
+          const newWall: WallSegment = {
+            id: generateId(),
+            lengthFeet: 10,
+            lengthInches: 0,
+            label: `Wall ${wallNumber}`,
+            sqft: 0,
+          };
+          const updatedRoom = {
+            ...room,
+            customWalls: [...room.customWalls, newWall],
+          };
+          return updateRoomCalculations(updatedRoom);
+        })
+      );
+    },
+    [updateRoomCalculations]
+  );
+
+  const updateCustomWall = useCallback(
+    (
+      roomId: string,
+      wallId: string,
+      updates: Partial<Omit<WallSegment, "id" | "sqft">>
+    ) => {
+      setRooms((prev) =>
+        prev.map((room) => {
+          if (room.id !== roomId) return room;
+          const updatedWalls = room.customWalls.map((wall) => {
+            if (wall.id !== wallId) return wall;
+            return { ...wall, ...updates };
+          });
+          const updatedRoom = {
+            ...room,
+            customWalls: updatedWalls,
+          };
+          return updateRoomCalculations(updatedRoom);
+        })
+      );
+    },
+    [updateRoomCalculations]
+  );
+
+  const removeCustomWall = useCallback(
+    (roomId: string, wallId: string) => {
+      setRooms((prev) =>
+        prev.map((room) => {
+          if (room.id !== roomId) return room;
+          const updatedRoom = {
+            ...room,
+            customWalls: room.customWalls.filter((w) => w.id !== wallId),
+          };
+          return updateRoomCalculations(updatedRoom);
+        })
+      );
+    },
+    [updateRoomCalculations]
+  );
+
   // Sheet management
   const addSheet = useCallback(
     (
@@ -368,6 +469,51 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       ];
     });
   }, [rooms, wasteFactor, customRates]);
+
+  // Set sqft directly and update sheets (for project wizard integration)
+  const setSqft = useCallback(
+    (totalSqft: number) => {
+      if (totalSqft <= 0) {
+        return;
+      }
+
+      // Preserve current selection or use defaults
+      setSheets((prevSheets) => {
+        const currentSheet = prevSheets[0];
+        const typeId: DrywallSheetTypeId =
+          currentSheet?.typeId ?? "standard_half";
+        const size: DrywallSheetSize = currentSheet?.size ?? "4x8";
+        const sheetId = currentSheet?.id ?? generateId();
+
+        const sizeInfo = getSheetSize(size);
+        if (!sizeInfo) return prevSheets;
+
+        const sheetsNeeded = calculateSheetsNeeded(
+          totalSqft,
+          size,
+          wasteFactor
+        );
+
+        const materialCost = getSheetMaterialCost(typeId, customRates);
+        const laborCost = getSheetLaborCost(typeId, customRates);
+        const totalPerSheet = materialCost + laborCost;
+
+        return [
+          {
+            id: sheetId,
+            typeId,
+            size,
+            quantity: sheetsNeeded,
+            materialCost,
+            laborCost,
+            totalPerSheet,
+            subtotal: totalPerSheet * sheetsNeeded,
+          },
+        ];
+      });
+    },
+    [wasteFactor, customRates]
+  );
 
   // Addon management
   const toggleAddon = useCallback(
@@ -509,10 +655,14 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     addCustomOpening,
     updateOpening,
     removeOpening,
+    addCustomWall,
+    updateCustomWall,
+    removeCustomWall,
     addSheet,
     updateSheet,
     removeSheet,
     calculateSheetsFromRooms,
+    setSqft,
     setCeilingFactor,
     setWasteFactor,
     setComplexity,

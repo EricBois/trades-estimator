@@ -110,6 +110,7 @@ export interface CreateEstimateInput {
   rangeLow: number;
   rangeHigh: number;
   expiresAt?: string;
+  projectId?: string;
 }
 
 export function useCreateEstimate() {
@@ -132,6 +133,7 @@ export function useCreateEstimate() {
           range_high: input.rangeHigh,
           status: "draft",
           expires_at: input.expiresAt ?? null,
+          project_id: input.projectId ?? null,
         })
         .select()
         .single();

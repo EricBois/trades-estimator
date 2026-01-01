@@ -4,8 +4,8 @@ import { useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DRYWALL_ADDONS,
-  DRYWALL_RATES,
   DRYWALL_COMPLEXITY_MULTIPLIERS,
+  DRYWALL_FINISH_LEVELS,
   getRateRange,
 } from "@/lib/trades/drywallFinishing/constants";
 import {
@@ -60,42 +60,48 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   );
 
   // Helper to get the user's rate for a line item type
-  const getRateForType = useCallback((type: DrywallLineItemType): number => {
-    if (type === "hourly") return hourlyRate;
-    if (type === "addon") return 0;
-    // For sqft and linear types, use user's custom rate or industry default
-    return getUserDrywallRate(type as DrywallRateType, customRates);
-  }, [hourlyRate, customRates]);
+  const getRateForType = useCallback(
+    (type: DrywallLineItemType): number => {
+      if (type === "hourly") return hourlyRate;
+      if (type === "addon") return 0;
+      // For sqft and linear types, use user's custom rate or industry default
+      return getUserDrywallRate(type as DrywallRateType, customRates);
+    },
+    [hourlyRate, customRates]
+  );
 
   // Add a new line item
-  const addLineItem = useCallback((type: DrywallLineItemType) => {
-    const rate = getRateForType(type);
-    const newItem: DrywallLineItem = {
-      id: generateId(),
-      type,
-      description: "",
-      quantity: type === "hourly" ? 1 : 100, // Default 1 hour or 100 sqft
-      rate,
-      total: type === "hourly" ? rate : rate * 100,
-    };
-    setLineItems((prev) => [...prev, newItem]);
-  }, [getRateForType]);
+  const addLineItem = useCallback(
+    (type: DrywallLineItemType) => {
+      const rate = getRateForType(type);
+      const newItem: DrywallLineItem = {
+        id: generateId(),
+        type,
+        description: "",
+        quantity: type === "hourly" ? 1 : 100, // Default 1 hour or 100 sqft
+        rate,
+        total: type === "hourly" ? rate : rate * 100,
+      };
+      setLineItems((prev) => [...prev, newItem]);
+    },
+    [getRateForType]
+  );
 
   // Update a line item
-  const updateLineItem = useCallback((
-    id: string,
-    updates: Partial<Omit<DrywallLineItem, "id" | "total">>
-  ) => {
-    setLineItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const updated = { ...item, ...updates };
-        // Recalculate total
-        updated.total = updated.quantity * updated.rate;
-        return updated;
-      })
-    );
-  }, []);
+  const updateLineItem = useCallback(
+    (id: string, updates: Partial<Omit<DrywallLineItem, "id" | "total">>) => {
+      setLineItems((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          const updated = { ...item, ...updates };
+          // Recalculate total
+          updated.total = updated.quantity * updated.rate;
+          return updated;
+        })
+      );
+    },
+    []
+  );
 
   // Remove a line item
   const removeLineItem = useCallback((id: string) => {
@@ -103,26 +109,30 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   }, []);
 
   // Toggle an addon (add/remove)
-  const toggleAddon = useCallback((addonId: DrywallAddonId, quantity: number = 1) => {
-    setAddons((prev) => {
-      const existing = prev.find((a) => a.id === addonId);
-      if (existing) {
-        // Remove it
-        return prev.filter((a) => a.id !== addonId);
-      }
-      // Add it
-      const addonDef = DRYWALL_ADDONS.find((a) => a.id === addonId);
-      if (!addonDef) return prev;
+  const toggleAddon = useCallback(
+    (addonId: DrywallAddonId, quantity: number = 1) => {
+      setAddons((prev) => {
+        const existing = prev.find((a) => a.id === addonId);
+        if (existing) {
+          // Remove it
+          return prev.filter((a) => a.id !== addonId);
+        }
+        // Add it
+        const addonDef = DRYWALL_ADDONS.find((a) => a.id === addonId);
+        if (!addonDef) return prev;
 
-      // Use custom price from settings or default
-      const price = getUserAddonPrice(addonId, customRates);
-      const total = addonDef.unit === "sqft" || addonDef.unit === "each"
-        ? price * quantity
-        : price;
+        // Use custom price from settings or default
+        const price = getUserAddonPrice(addonId, customRates);
+        const total =
+          addonDef.unit === "sqft" || addonDef.unit === "each"
+            ? price * quantity
+            : price;
 
-      return [...prev, { id: addonId, quantity, total }];
-    });
-  }, [customRates]);
+        return [...prev, { id: addonId, quantity, total }];
+      });
+    },
+    [customRates]
+  );
 
   // Remove an addon
   const removeAddon = useCallback((addonId: DrywallAddonId) => {
@@ -130,23 +140,75 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   }, []);
 
   // Update addon quantity
-  const updateAddonQuantity = useCallback((addonId: DrywallAddonId, quantity: number) => {
-    setAddons((prev) =>
-      prev.map((addon) => {
-        if (addon.id !== addonId) return addon;
-        const addonDef = DRYWALL_ADDONS.find((a) => a.id === addonId);
-        if (!addonDef) return addon;
+  const updateAddonQuantity = useCallback(
+    (addonId: DrywallAddonId, quantity: number) => {
+      setAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== addonId) return addon;
+          const addonDef = DRYWALL_ADDONS.find((a) => a.id === addonId);
+          if (!addonDef) return addon;
 
-        // Use custom price from settings or default
-        const price = getUserAddonPrice(addonId, customRates);
-        const total = addonDef.unit === "sqft" || addonDef.unit === "each"
-          ? price * quantity
-          : price;
+          // Use custom price from settings or default
+          const price = getUserAddonPrice(addonId, customRates);
+          const total =
+            addonDef.unit === "sqft" || addonDef.unit === "each"
+              ? price * quantity
+              : price;
 
-        return { ...addon, quantity, total };
-      })
-    );
-  }, [customRates]);
+          return { ...addon, quantity, total };
+        })
+      );
+    },
+    [customRates]
+  );
+
+  // Set sqft directly and create/update a sqft line item (for project wizard)
+  const setSqft = useCallback(
+    (totalSqft: number) => {
+      if (totalSqft <= 0) {
+        return;
+      }
+
+      // Get rate from finish level
+      const finishLevelInfo = DRYWALL_FINISH_LEVELS.find(
+        (l) => l.value === finishLevel
+      );
+      const rate = finishLevelInfo?.sqftRate ?? 0.55; // Default to level 4 rate
+
+      // Create or update a sqft_standard line item
+      setLineItems((prev) => {
+        // Find existing sqft line item
+        const existingIndex = prev.findIndex(
+          (item) =>
+            item.type === "sqft_standard" || item.type === "sqft_premium"
+        );
+
+        if (existingIndex >= 0) {
+          // Update existing
+          const updated = [...prev];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            quantity: totalSqft,
+            rate,
+            total: totalSqft * rate,
+          };
+          return updated;
+        }
+
+        // Create new sqft line item
+        const newItem: DrywallLineItem = {
+          id: generateId(),
+          type: "sqft_standard",
+          description: "Wall & Ceiling Finishing",
+          quantity: totalSqft,
+          rate,
+          total: totalSqft * rate,
+        };
+        return [newItem, ...prev];
+      });
+    },
+    [finishLevel]
+  );
 
   // Reset all state
   const reset = useCallback(() => {
@@ -159,7 +221,10 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   // Calculate totals
   const totals = useMemo((): DrywallEstimateTotals => {
     // Line items subtotal
-    const lineItemsSubtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
+    const lineItemsSubtotal = lineItems.reduce(
+      (sum, item) => sum + item.total,
+      0
+    );
 
     // Addons subtotal
     const addonsSubtotal = addons.reduce((sum, addon) => sum + addon.total, 0);
@@ -235,6 +300,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     removeAddon,
     updateAddonQuantity,
     setComplexity,
+    setSqft,
     reset,
   };
 }

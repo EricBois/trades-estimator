@@ -15,6 +15,37 @@ export {
 } from "./useEstimates";
 export type { Estimate, CreateEstimateInput } from "./useEstimates";
 export { useUpdateProfile } from "./useProfile";
-export type { UpdateProfileInput, CustomRates, DrywallFinishingRates, DrywallAddonPrices } from "./useProfile";
-export { useCompleteOnboarding, useSkipOnboarding } from "./useTemplatesOnboarding";
-export type { TemplateCustomization, SelectedTemplate, CompleteOnboardingInput } from "./useTemplatesOnboarding";
+export type {
+  UpdateProfileInput,
+  CustomRates,
+  DrywallFinishingRates,
+  DrywallAddonPrices,
+  PaintingRates,
+  PaintingAddonPrices,
+} from "./useProfile";
+export {
+  useCompleteOnboarding,
+  useSkipOnboarding,
+} from "./useTemplatesOnboarding";
+export type {
+  TemplateCustomization,
+  SelectedTemplate,
+  CompleteOnboardingInput,
+} from "./useTemplatesOnboarding";
+
+// Project hooks
+export {
+  useProjects,
+  useProject,
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+  useProjectRooms,
+  useProjectRoomsQuery,
+  useProjectEstimate,
+} from "./project";
+export type {
+  CreateProjectInput,
+  UpdateProjectInput,
+  UseProjectEstimateReturn,
+} from "./project";

@@ -2,10 +2,11 @@ import { DRYWALL_LINE_ITEM_TYPES, DRYWALL_ADDONS } from "./constants";
 import { DrywallFinishingRates, DrywallAddonPrices } from "@/hooks/useProfile";
 
 // Line item type values
-export type DrywallLineItemType = typeof DRYWALL_LINE_ITEM_TYPES[number]["value"];
+export type DrywallLineItemType =
+  (typeof DRYWALL_LINE_ITEM_TYPES)[number]["value"];
 
 // Add-on IDs
-export type DrywallAddonId = typeof DRYWALL_ADDONS[number]["id"];
+export type DrywallAddonId = (typeof DRYWALL_ADDONS)[number]["id"];
 
 // Finish levels (3, 4, or 5)
 export type DrywallFinishLevel = 3 | 4 | 5;
@@ -62,17 +63,24 @@ export interface DrywallEstimate extends DrywallEstimateData {
 export interface DrywallEstimateActions {
   setFinishLevel: (level: DrywallFinishLevel) => void;
   addLineItem: (type: DrywallLineItemType) => void;
-  updateLineItem: (id: string, updates: Partial<Omit<DrywallLineItem, "id" | "total">>) => void;
+  updateLineItem: (
+    id: string,
+    updates: Partial<Omit<DrywallLineItem, "id" | "total">>
+  ) => void;
   removeLineItem: (id: string) => void;
   toggleAddon: (addonId: DrywallAddonId, quantity?: number) => void;
   removeAddon: (addonId: DrywallAddonId) => void;
   updateAddonQuantity: (addonId: DrywallAddonId, quantity: number) => void;
   setComplexity: (complexity: DrywallComplexity) => void;
+  // Set sqft directly (for project wizard integration)
+  setSqft: (totalSqft: number) => void;
   reset: () => void;
 }
 
 // Full hook return type
-export interface UseDrywallFinishingEstimateReturn extends DrywallEstimate, DrywallEstimateActions {
+export interface UseDrywallFinishingEstimateReturn
+  extends DrywallEstimate,
+    DrywallEstimateActions {
   // User's default rates (from settings or industry defaults)
   defaultRates: DrywallFinishingRates;
   // User's default add-on prices (from settings or defaults)

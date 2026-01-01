@@ -41,11 +41,32 @@ export interface DrywallHangingAddonPrices {
   vapor_barrier?: number; // per sqft
 }
 
+// Painting rates
+export interface PaintingRates {
+  labor_per_sqft?: number; // $/sqft
+  material_per_sqft?: number; // $/sqft
+  ceiling_modifier?: number; // multiplier for ceiling work
+}
+
+// Painting add-on prices
+export interface PaintingAddonPrices {
+  trim_paint?: number; // per linear ft
+  door_paint?: number; // per each
+  cabinet_paint?: number; // per each
+  ceiling_texture?: number; // per sqft
+  accent_wall?: number; // per sqft
+  wallpaper_removal?: number; // per sqft
+  high_ceiling?: number; // per sqft
+  furniture_moving?: number; // flat
+}
+
 export interface CustomRates {
   drywall_finishing?: DrywallFinishingRates;
   drywall_addons?: DrywallAddonPrices;
   drywall_hanging?: DrywallHangingRates;
   drywall_hanging_addons?: DrywallHangingAddonPrices;
+  painting?: PaintingRates;
+  painting_addons?: PaintingAddonPrices;
 }
 
 export interface UpdateProfileInput {

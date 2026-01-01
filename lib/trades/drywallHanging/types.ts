@@ -31,6 +31,32 @@ export type HangingAddonId = (typeof HANGING_ADDONS)[number]["id"];
 // Complexity levels
 export type HangingComplexity = "simple" | "standard" | "complex";
 
+// Room shape
+export type RoomShape = "rectangular" | "l_shape" | "custom";
+
+// Wall segment for custom rooms
+export interface WallSegment {
+  id: string;
+  lengthFeet: number;
+  lengthInches: number;
+  label: string;
+  sqft: number; // calculated
+}
+
+// L-shape dimensions
+export interface LShapeDimensions {
+  // Main section
+  mainLengthFeet: number;
+  mainLengthInches: number;
+  mainWidthFeet: number;
+  mainWidthInches: number;
+  // Extension section
+  extLengthFeet: number;
+  extLengthInches: number;
+  extWidthFeet: number;
+  extWidthInches: number;
+}
+
 // Opening (door/window)
 export interface HangingOpening {
   id: string;
@@ -47,12 +73,20 @@ export interface HangingOpening {
 export interface HangingRoom {
   id: string;
   name: string;
+  shape: RoomShape;
+  // Rectangular dimensions (used when shape="rectangular")
   lengthFeet: number;
   lengthInches: number;
   widthFeet: number;
   widthInches: number;
   heightFeet: number;
   heightInches: number;
+  // L-shape dimensions (used when shape="l_shape")
+  lShapeDimensions?: LShapeDimensions;
+  // Custom walls (used when shape="custom")
+  customWalls: WallSegment[];
+  customCeilingSqft?: number;
+  // Common fields
   includeCeiling: boolean;
   doors: HangingOpening[];
   windows: HangingOpening[];
@@ -127,6 +161,14 @@ export interface DrywallHangingEstimateActions {
     >
   ) => void;
   removeRoom: (id: string) => void;
+  // Custom wall management
+  addCustomWall: (roomId: string) => void;
+  updateCustomWall: (
+    roomId: string,
+    wallId: string,
+    updates: Partial<Omit<WallSegment, "id" | "sqft">>
+  ) => void;
+  removeCustomWall: (roomId: string, wallId: string) => void;
   // Opening management
   addOpening: (
     roomId: string,
@@ -162,6 +204,8 @@ export interface DrywallHangingEstimateActions {
   ) => void;
   removeSheet: (id: string) => void;
   calculateSheetsFromRooms: () => void;
+  // Set sqft directly (for project wizard integration)
+  setSqft: (totalSqft: number) => void;
   // Settings
   setCeilingFactor: (factor: CeilingHeightFactor) => void;
   setWasteFactor: (factor: number) => void;
