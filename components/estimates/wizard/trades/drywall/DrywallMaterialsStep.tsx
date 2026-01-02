@@ -152,6 +152,26 @@ export function DrywallMaterialsStep({
     });
   };
 
+  // Get preset materials for a category, hiding ones that have custom overrides
+  const getFilteredPresetMaterials = (category: FinishingMaterialCategory) => {
+    const presets = getMaterialsByCategory(category);
+    const categoryCustom = getCustomMaterialsForCategory(category);
+
+    // Build a set of preset IDs that have custom overrides
+    const overriddenPresetIds = new Set<string>();
+    for (const custom of categoryCustom) {
+      // If custom material has a presetId, it's an override
+      if (custom.presetId) {
+        overriddenPresetIds.add(custom.presetId);
+      }
+      // Also hide presets that match by ID (direct replacement)
+      overriddenPresetIds.add(custom.id);
+    }
+
+    // Filter out presets that have been overridden
+    return presets.filter((preset) => !overriddenPresetIds.has(preset.id));
+  };
+
   const handleQuantityChange = (id: string, delta: number) => {
     const entry = materials.find((m) => m.id === id);
     if (!entry) return;
@@ -274,10 +294,11 @@ export function DrywallMaterialsStep({
       <div className="space-y-3">
         {FINISHING_MATERIAL_CATEGORIES.map((category) => {
           const isExpanded = expandedCategory === category.id;
-          const categoryMaterials = getMaterialsByCategory(
+          const categoryCustomMaterials = getCustomMaterialsForCategory(
             category.id as FinishingMaterialCategory
           );
-          const categoryCustomMaterials = getCustomMaterialsForCategory(
+          // Get presets, but hide ones that have custom overrides
+          const categoryMaterials = getFilteredPresetMaterials(
             category.id as FinishingMaterialCategory
           );
           const totalOptions =

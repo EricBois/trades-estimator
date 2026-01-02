@@ -43,6 +43,7 @@ import {
   WallSegment,
   RoomShape,
 } from "@/lib/trades/drywallHanging/types";
+import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
 
 // Generate unique ID
 function generateId(): string {
@@ -107,6 +108,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
   const [wasteFactor, setWasteFactor] = useState<number>(0.12);
   const [complexity, setComplexity] = useState<HangingComplexity>("standard");
   const [addons, setAddons] = useState<HangingSelectedAddon[]>([]);
+  const [customAddons, setCustomAddons] = useState<CustomAddon[]>([]);
 
   // Get hourly rate from profile
   const hourlyRate = profile?.hourly_rate ?? 75;
@@ -692,6 +694,42 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     [customRates]
   );
 
+  // Custom addon management
+  const addCustomAddon = useCallback(
+    (name: string, price: number, unit: AddonUnit, quantity: number = 1) => {
+      const total = unit === "flat" ? price : price * quantity;
+      const newAddon: CustomAddon = {
+        id: generateId(),
+        name,
+        price,
+        unit,
+        quantity,
+        total,
+        isCustom: true,
+      };
+      setCustomAddons((prev) => [...prev, newAddon]);
+    },
+    []
+  );
+
+  const updateCustomAddon = useCallback(
+    (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => {
+      setCustomAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== id) return addon;
+          const updated = { ...addon, ...updates };
+          updated.total = updated.unit === "flat" ? updated.price : updated.price * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const removeCustomAddon = useCallback((id: string) => {
+    setCustomAddons((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
   // Input mode setter with side effects for labor_only mode
   const setInputMode = useCallback((mode: HangingInputMode) => {
     setInputModeState(mode);
@@ -741,6 +779,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     setWasteFactor(getUserDefaultWasteFactor(customRates));
     setComplexity("standard");
     setAddons([]);
+    setCustomAddons([]);
   }, [customRates]);
 
   // Calculate totals
@@ -760,8 +799,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       // No material cost in labor_only mode
       const materialSubtotal = 0;
 
-      // Addons subtotal
-      const addonsSubtotal = addons.reduce((sum, a) => sum + a.total, 0);
+      // Addons subtotal (including custom addons)
+      const predefinedAddonsTotal = addons.reduce((sum, a) => sum + a.total, 0);
+      const customAddonsTotal = customAddons.reduce((sum, a) => sum + a.total, 0);
+      const addonsSubtotal = predefinedAddonsTotal + customAddonsTotal;
 
       // Subtotal
       const subtotal = materialSubtotal + laborSubtotal + addonsSubtotal;
@@ -818,8 +859,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         return sum + effectiveCost * s.quantity;
       }, 0) * ceilingMultiplier;
 
-    // Addons subtotal
-    const addonsSubtotal = addons.reduce((sum, a) => sum + a.total, 0);
+    // Addons subtotal (including custom addons)
+    const predefinedAddonsTotal = addons.reduce((sum, a) => sum + a.total, 0);
+    const customAddonsTotal = customAddons.reduce((sum, a) => sum + a.total, 0);
+    const addonsSubtotal = predefinedAddonsTotal + customAddonsTotal;
 
     // Subtotal
     const subtotal = materialSubtotal + laborSubtotal + addonsSubtotal;
@@ -857,6 +900,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     ceilingFactor,
     complexity,
     addons,
+    customAddons,
     customRates,
   ]);
 
@@ -872,6 +916,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     wasteFactor,
     complexity,
     addons,
+    customAddons,
     totals,
     defaultRates,
     defaultAddonPrices,
@@ -902,6 +947,9 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     toggleAddon,
     updateAddonQuantity,
     removeAddon,
+    addCustomAddon,
+    updateCustomAddon,
+    removeCustomAddon,
     setSheetIncludeMaterial,
     setSheetMaterialCostOverride,
     setSheetLaborCostOverride,

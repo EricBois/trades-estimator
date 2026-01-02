@@ -3,20 +3,38 @@
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Check } from "lucide-react";
-import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useDrywallEstimateSafe } from "./DrywallEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import {
   WIZARD_COMPLEXITY_LEVELS,
   COMPLEXITY_DESCRIPTIONS,
 } from "@/lib/constants";
-import { DrywallComplexity } from "@/lib/trades/drywallFinishing/types";
+import {
+  DrywallComplexity,
+  UseDrywallFinishingEstimateReturn,
+} from "@/lib/trades/drywallFinishing/types";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 
-export function DrywallComplexityStep() {
+export function DrywallComplexityStep({
+  finishingEstimate,
+}: {
+  finishingEstimate?: UseDrywallFinishingEstimateReturn;
+} = {}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
-  const { complexity, setComplexity, totals } = useDrywallEstimate();
+
+  // Use prop if provided, otherwise fall back to context (backwards compatible)
+  const contextEstimate = useDrywallEstimateSafe();
+  const estimate = finishingEstimate ?? contextEstimate;
+
+  if (!estimate) {
+    throw new Error(
+      "DrywallComplexityStep requires either finishingEstimate prop or DrywallEstimateProvider"
+    );
+  }
+
+  const { complexity, setComplexity, totals } = estimate;
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);

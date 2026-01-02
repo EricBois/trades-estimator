@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { useHangingEstimate } from "./HangingEstimateContext";
+import { useHangingEstimateSafe } from "./HangingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import {
   HANGING_COMPLEXITY_MULTIPLIERS,
@@ -11,6 +11,7 @@ import {
 import {
   HangingComplexity,
   CeilingHeightFactor,
+  UseDrywallHangingEstimateReturn,
 } from "@/lib/trades/drywallHanging/types";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
@@ -41,11 +42,26 @@ const COMPLEXITY_OPTIONS: {
   },
 ];
 
-export function HangingComplexityStep() {
+export function HangingComplexityStep({
+  hangingEstimate,
+}: {
+  hangingEstimate?: UseDrywallHangingEstimateReturn;
+} = {}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
+
+  // Use prop if provided, otherwise fall back to context (backwards compatible)
+  const contextEstimate = useHangingEstimateSafe();
+  const estimate = hangingEstimate ?? contextEstimate;
+
+  if (!estimate) {
+    throw new Error(
+      "HangingComplexityStep requires either hangingEstimate prop or HangingEstimateProvider"
+    );
+  }
+
   const { complexity, setComplexity, ceilingFactor, setCeilingFactor, totals } =
-    useHangingEstimate();
+    estimate;
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);

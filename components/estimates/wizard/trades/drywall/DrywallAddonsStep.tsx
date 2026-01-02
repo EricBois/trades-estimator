@@ -3,25 +3,49 @@
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Check, Plus, Minus } from "lucide-react";
-import { useDrywallEstimate } from "./DrywallEstimateContext";
+import { useDrywallEstimateSafe } from "./DrywallEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import { DRYWALL_ADDONS } from "@/lib/trades/drywallFinishing/constants";
-import { DrywallAddonId } from "@/lib/trades/drywallFinishing/types";
+import {
+  DrywallAddonId,
+  UseDrywallFinishingEstimateReturn,
+} from "@/lib/trades/drywallFinishing/types";
 import { DrywallAddonPrices } from "@/hooks/useProfile";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
+import { CustomAddonInput } from "@/components/ui/CustomAddonInput";
+import { CustomAddonCard } from "@/components/ui/CustomAddonCard";
 
-export function DrywallAddonsStep() {
+export function DrywallAddonsStep({
+  finishingEstimate,
+}: {
+  finishingEstimate?: UseDrywallFinishingEstimateReturn;
+} = {}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
+
+  // Use prop if provided, otherwise fall back to context (backwards compatible)
+  const contextEstimate = useDrywallEstimateSafe();
+  const estimate = finishingEstimate ?? contextEstimate;
+
+  if (!estimate) {
+    throw new Error(
+      "DrywallAddonsStep requires either finishingEstimate prop or DrywallEstimateProvider"
+    );
+  }
+
   const {
     addons,
+    customAddons,
     toggleAddon,
     updateAddonQuantity,
+    addCustomAddon,
+    updateCustomAddon,
+    removeCustomAddon,
     totals,
     lineItems,
     defaultAddonPrices,
-  } = useDrywallEstimate();
+  } = estimate;
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);
@@ -185,8 +209,26 @@ export function DrywallAddonsStep() {
         })}
       </div>
 
+      {/* Custom Add-ons */}
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">
+          Custom Add-ons
+        </h3>
+        <div className="space-y-3">
+          {customAddons.map((addon) => (
+            <CustomAddonCard
+              key={addon.id}
+              addon={addon}
+              onUpdate={(updates) => updateCustomAddon(addon.id, updates)}
+              onRemove={() => removeCustomAddon(addon.id)}
+            />
+          ))}
+          <CustomAddonInput onAdd={addCustomAddon} />
+        </div>
+      </div>
+
       {/* Add-ons Summary */}
-      {addons.length > 0 && (
+      {(addons.length > 0 || customAddons.length > 0) && (
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
           <span className="text-sm text-blue-600">Add-ons: </span>
           <span className="text-lg font-bold text-blue-900">

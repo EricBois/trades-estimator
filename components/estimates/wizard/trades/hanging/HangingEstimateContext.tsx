@@ -26,3 +26,8 @@ export function useHangingEstimate() {
   }
   return context;
 }
+
+// Safe version that returns null instead of throwing (for reusable components)
+export function useHangingEstimateSafe() {
+  return useContext(HangingEstimateContext);
+}

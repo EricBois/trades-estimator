@@ -30,6 +30,7 @@ import {
   DrywallEstimateTotals,
   UseDrywallFinishingEstimateReturn,
 } from "@/lib/trades/drywallFinishing/types";
+import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
 
 // Generate unique ID for line items
 function generateId(): string {
@@ -43,6 +44,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   const [finishLevel, setFinishLevel] = useState<DrywallFinishLevel>(4);
   const [lineItems, setLineItems] = useState<DrywallLineItem[]>([]);
   const [addons, setAddons] = useState<DrywallSelectedAddon[]>([]);
+  const [customAddons, setCustomAddons] = useState<CustomAddon[]>([]);
   const [materials, setMaterials] = useState<FinishingMaterialEntry[]>([]);
   const [complexity, setComplexity] = useState<DrywallComplexity>("standard");
 
@@ -175,7 +177,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
             ? price * quantity
             : price;
 
-        return [...prev, { id: addonId, quantity, total }];
+        return [...prev, { id: addonId, quantity, total, hasOverride: false }];
       });
     },
     [customRates]
@@ -195,8 +197,8 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
           const addonDef = DRYWALL_ADDONS.find((a) => a.id === addonId);
           if (!addonDef) return addon;
 
-          // Use custom price from settings or default
-          const price = getUserAddonPrice(addonId, customRates);
+          // Use override or custom price from settings or default
+          const price = addon.priceOverride ?? getUserAddonPrice(addonId, customRates);
           const total =
             addonDef.unit === "sqft" || addonDef.unit === "each"
               ? price * quantity
@@ -208,6 +210,69 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     },
     [customRates]
   );
+
+  // Set addon price override
+  const setAddonPriceOverride = useCallback(
+    (addonId: DrywallAddonId, override: number | undefined) => {
+      setAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== addonId) return addon;
+          const addonDef = DRYWALL_ADDONS.find((a) => a.id === addonId);
+          if (!addonDef) return addon;
+
+          const price = override ?? getUserAddonPrice(addonId, customRates);
+          const total =
+            addonDef.unit === "sqft" || addonDef.unit === "each"
+              ? price * addon.quantity
+              : price;
+
+          return {
+            ...addon,
+            priceOverride: override,
+            hasOverride: override !== undefined,
+            total,
+          };
+        })
+      );
+    },
+    [customRates]
+  );
+
+  // Custom addon management
+  const addCustomAddon = useCallback(
+    (name: string, price: number, unit: AddonUnit, quantity: number = 1) => {
+      const total = unit === "flat" ? price : price * quantity;
+      const newAddon: CustomAddon = {
+        id: generateId(),
+        name,
+        price,
+        unit,
+        quantity,
+        total,
+        isCustom: true,
+      };
+      setCustomAddons((prev) => [...prev, newAddon]);
+    },
+    []
+  );
+
+  const updateCustomAddon = useCallback(
+    (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => {
+      setCustomAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== id) return addon;
+          const updated = { ...addon, ...updates };
+          updated.total = updated.unit === "flat" ? updated.price : updated.price * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const removeCustomAddon = useCallback((id: string) => {
+    setCustomAddons((prev) => prev.filter((a) => a.id !== id));
+  }, []);
 
   // Set sqft directly and create/update a sqft line item (for project wizard)
   const setSqft = useCallback(
@@ -471,6 +536,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     setFinishLevel(4);
     setLineItems([]);
     setAddons([]);
+    setCustomAddons([]);
     setMaterials([]);
     setComplexity("standard");
   }, []);
@@ -488,8 +554,10 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     );
     const lineItemsSubtotal = materialSubtotal + laborSubtotal;
 
-    // Addons subtotal
-    const addonsSubtotal = addons.reduce((sum, addon) => sum + addon.total, 0);
+    // Addons subtotal (including custom addons)
+    const predefinedAddonsTotal = addons.reduce((sum, addon) => sum + addon.total, 0);
+    const customAddonsTotal = customAddons.reduce((sum, addon) => sum + addon.total, 0);
+    const addonsSubtotal = predefinedAddonsTotal + customAddonsTotal;
 
     // Manual materials subtotal
     const materialsSubtotal = materials.reduce(
@@ -561,13 +629,14 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
         high: Math.round(rangeHigh),
       },
     };
-  }, [lineItems, addons, materials, complexity]);
+  }, [lineItems, addons, customAddons, materials, complexity]);
 
   return {
     // Data
     finishLevel,
     lineItems,
     addons,
+    customAddons,
     materials,
     complexity,
     totals,
@@ -582,6 +651,10 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     toggleAddon,
     removeAddon,
     updateAddonQuantity,
+    setAddonPriceOverride,
+    addCustomAddon,
+    updateCustomAddon,
+    removeCustomAddon,
     setComplexity,
     setSqft,
     setLineItemIncludeMaterial,

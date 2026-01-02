@@ -6,6 +6,7 @@ import {
 } from "./constants";
 import { PaintingRates, PaintingAddonPrices } from "@/hooks/useProfile";
 import { TradeRoomView } from "@/lib/project/types";
+import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
 
 // Coat count
 export type PaintingCoatCount = (typeof PAINT_COAT_OPTIONS)[number]["value"];
@@ -28,6 +29,9 @@ export interface PaintingSelectedAddon {
   id: PaintingAddonId;
   quantity: number;
   total: number;
+  // Override fields
+  priceOverride?: number;
+  hasOverride: boolean;
 }
 
 // Complete estimate data
@@ -37,6 +41,7 @@ export interface PaintingEstimateData {
   surfacePrep: PaintingSurfacePrep;
   complexity: PaintingComplexity;
   addons: PaintingSelectedAddon[];
+  customAddons: CustomAddon[];
   // Square footage can come from shared project rooms or direct entry
   totalSqft: number;
   ceilingSqft: number;
@@ -78,6 +83,11 @@ export interface PaintingEstimateActions {
   toggleAddon: (addonId: PaintingAddonId, quantity?: number) => void;
   updateAddonQuantity: (addonId: PaintingAddonId, quantity: number) => void;
   removeAddon: (addonId: PaintingAddonId) => void;
+  setAddonPriceOverride: (addonId: PaintingAddonId, override: number | undefined) => void;
+  // Custom addon management
+  addCustomAddon: (name: string, price: number, unit: AddonUnit, quantity?: number) => void;
+  updateCustomAddon: (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => void;
+  removeCustomAddon: (id: string) => void;
   // Square footage (for standalone or override)
   setTotalSqft: (sqft: number) => void;
   setWallSqft: (sqft: number) => void;

@@ -8,6 +8,7 @@ import {
   DrywallHangingRates,
   DrywallHangingAddonPrices,
 } from "@/hooks/useProfile";
+import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
 
 // Input mode
 export type HangingInputMode = "calculator" | "direct" | "labor_only";
@@ -137,6 +138,7 @@ export interface DrywallHangingEstimateData {
   wasteFactor: number;
   complexity: HangingComplexity;
   addons: HangingSelectedAddon[];
+  customAddons: CustomAddon[];
 }
 
 // Totals breakdown
@@ -227,6 +229,10 @@ export interface DrywallHangingEstimateActions {
   toggleAddon: (addonId: HangingAddonId, quantity?: number) => void;
   updateAddonQuantity: (addonId: HangingAddonId, quantity: number) => void;
   removeAddon: (addonId: HangingAddonId) => void;
+  // Custom addon management
+  addCustomAddon: (name: string, price: number, unit: AddonUnit, quantity?: number) => void;
+  updateCustomAddon: (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => void;
+  removeCustomAddon: (id: string) => void;
   // Material toggle and overrides
   setSheetIncludeMaterial: (id: string, include: boolean) => void;
   setSheetMaterialCostOverride: (

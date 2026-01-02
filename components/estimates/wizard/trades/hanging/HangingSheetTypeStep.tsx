@@ -11,7 +11,8 @@ import {
   Shield,
   Check,
 } from "lucide-react";
-import { useHangingEstimate } from "./HangingEstimateContext";
+import { useHangingEstimateSafe } from "./HangingEstimateContext";
+import { UseDrywallHangingEstimateReturn } from "@/lib/trades/drywallHanging/types";
 import { useWizardFooter } from "../../WizardFooterContext";
 import {
   DRYWALL_SHEET_TYPES,
@@ -39,9 +40,24 @@ const ICONS: Record<string, React.ElementType> = {
   Shield,
 };
 
-export function HangingSheetTypeStep() {
+export function HangingSheetTypeStep({
+  hangingEstimate,
+}: {
+  hangingEstimate?: UseDrywallHangingEstimateReturn;
+} = {}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
+
+  // Use prop if provided, otherwise fall back to context (backwards compatible)
+  const contextEstimate = useHangingEstimateSafe();
+  const estimate = hangingEstimate ?? contextEstimate;
+
+  if (!estimate) {
+    throw new Error(
+      "HangingSheetTypeStep requires either hangingEstimate prop or HangingEstimateProvider"
+    );
+  }
+
   const {
     rooms,
     sheets,
@@ -52,7 +68,7 @@ export function HangingSheetTypeStep() {
     removeSheet,
     calculateSheetsFromRooms,
     totals,
-  } = useHangingEstimate();
+  } = estimate;
 
   // Calculate sheets from rooms on first load if no sheets exist
   useEffect(() => {
@@ -261,65 +277,6 @@ export function HangingSheetTypeStep() {
           }
           getValue={(opt: (typeof WASTE_FACTORS)[number]) => opt.value}
         />
-      </div>
-
-      {/* Allocation Status */}
-      <div
-        className={cn(
-          "rounded-xl p-4 mb-4",
-          remainingSheets === 0 && allocatedSheets > 0
-            ? "bg-green-50 border border-green-200"
-            : remainingSheets < 0
-            ? "bg-orange-50 border border-orange-200"
-            : "bg-gray-50 border border-gray-200"
-        )}
-      >
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-gray-600">Sheets Needed</span>
-          <span className="font-semibold text-gray-900">
-            {totalSheetsNeeded}
-          </span>
-        </div>
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-gray-600">Allocated</span>
-          <span className="font-semibold text-gray-900">{allocatedSheets}</span>
-        </div>
-        <div className="border-t border-gray-200 pt-1 mt-1">
-          <div className="flex justify-between items-center">
-            <span
-              className={cn(
-                "text-sm font-medium",
-                remainingSheets === 0
-                  ? "text-green-600"
-                  : remainingSheets < 0
-                  ? "text-orange-600"
-                  : "text-blue-600"
-              )}
-            >
-              {remainingSheets === 0
-                ? "Fully Allocated"
-                : remainingSheets > 0
-                ? "Remaining"
-                : "Over Allocated"}
-            </span>
-            <span
-              className={cn(
-                "font-bold",
-                remainingSheets === 0
-                  ? "text-green-600"
-                  : remainingSheets < 0
-                  ? "text-orange-600"
-                  : "text-blue-600"
-              )}
-            >
-              {remainingSheets === 0
-                ? "✓"
-                : remainingSheets > 0
-                ? `${remainingSheets} sheets`
-                : `+${-remainingSheets} extra`}
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* Cost Summary */}

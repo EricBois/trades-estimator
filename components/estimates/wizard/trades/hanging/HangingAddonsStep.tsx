@@ -3,23 +3,41 @@
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { Check, Plus, Minus } from "lucide-react";
-import { useHangingEstimate } from "./HangingEstimateContext";
+import { useHangingEstimateSafe } from "./HangingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import { HANGING_ADDONS } from "@/lib/trades/drywallHanging/constants";
-import { HangingAddonId } from "@/lib/trades/drywallHanging/types";
+import {
+  HangingAddonId,
+  UseDrywallHangingEstimateReturn,
+} from "@/lib/trades/drywallHanging/types";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 
-export function HangingAddonsStep() {
+export function HangingAddonsStep({
+  hangingEstimate,
+}: {
+  hangingEstimate?: UseDrywallHangingEstimateReturn;
+} = {}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
+
+  // Use prop if provided, otherwise fall back to context (backwards compatible)
+  const contextEstimate = useHangingEstimateSafe();
+  const estimate = hangingEstimate ?? contextEstimate;
+
+  if (!estimate) {
+    throw new Error(
+      "HangingAddonsStep requires either hangingEstimate prop or HangingEstimateProvider"
+    );
+  }
+
   const {
     addons,
     toggleAddon,
     updateAddonQuantity,
     totals,
     defaultAddonPrices,
-  } = useHangingEstimate();
+  } = estimate;
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);

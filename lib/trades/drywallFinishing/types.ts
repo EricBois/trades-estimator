@@ -8,6 +8,7 @@ import {
   FINISHING_MATERIAL_CATEGORIES,
 } from "./constants";
 import { DrywallFinishingRates, DrywallAddonPrices } from "@/hooks/useProfile";
+import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
 
 // Line item type values
 export type DrywallLineItemType =
@@ -87,6 +88,9 @@ export interface DrywallSelectedAddon {
   id: DrywallAddonId;
   quantity: number;
   total: number;
+  // Override fields
+  priceOverride?: number;
+  hasOverride: boolean;
 }
 
 // Complete drywall estimate data
@@ -94,6 +98,7 @@ export interface DrywallEstimateData {
   finishLevel: DrywallFinishLevel;
   lineItems: DrywallLineItem[];
   addons: DrywallSelectedAddon[];
+  customAddons: CustomAddon[];
   materials: FinishingMaterialEntry[]; // Manual material entries
   complexity: DrywallComplexity;
 }
@@ -136,6 +141,11 @@ export interface DrywallEstimateActions {
   toggleAddon: (addonId: DrywallAddonId, quantity?: number) => void;
   removeAddon: (addonId: DrywallAddonId) => void;
   updateAddonQuantity: (addonId: DrywallAddonId, quantity: number) => void;
+  setAddonPriceOverride: (addonId: DrywallAddonId, override: number | undefined) => void;
+  // Custom addon management
+  addCustomAddon: (name: string, price: number, unit: AddonUnit, quantity?: number) => void;
+  updateCustomAddon: (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => void;
+  removeCustomAddon: (id: string) => void;
   setComplexity: (complexity: DrywallComplexity) => void;
   // Set sqft directly (for project wizard integration)
   setSqft: (totalSqft: number) => void;

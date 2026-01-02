@@ -12,11 +12,14 @@ import {
   PAINTING_ADDONS,
 } from "@/lib/trades/painting/constants";
 import { StepHeader } from "@/components/ui/StepHeader";
+import { InlineOverrideInput } from "@/components/ui/InlineOverrideInput";
+import { CustomAddonInput } from "@/components/ui/CustomAddonInput";
+import { CustomAddonCard } from "@/components/ui/CustomAddonCard";
 
 export function ProjectPaintingConfigStep() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
-  const { paintingEstimate, getTradeRoomViews } = useProjectEstimateContext();
+  const { paintingEstimate, getTradeRoomViews, roomsHook } = useProjectEstimateContext();
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);
@@ -35,19 +38,24 @@ export function ProjectPaintingConfigStep() {
     surfacePrep,
     complexity,
     addons,
+    customAddons,
     setCoatCount,
     setPaintQuality,
     setSurfacePrep,
     setComplexity,
     toggleAddon,
+    setAddonPriceOverride,
+    addCustomAddon,
+    updateCustomAddon,
+    removeCustomAddon,
   } = paintingEstimate;
 
   // Get room views for painting trade
   const tradeRooms = getTradeRoomViews("painting");
-  const totalSqft = tradeRooms.reduce(
-    (sum, r) => sum + r.effectiveTotalSqft,
-    0
-  );
+  const totalSqft =
+    roomsHook.inputMode === "manual" || roomsHook.rooms.length === 0
+      ? roomsHook.totalSqft
+      : tradeRooms.reduce((sum, r) => sum + r.effectiveTotalSqft, 0);
 
   return (
     <div className="flex flex-col h-full">
@@ -194,7 +202,8 @@ export function ProjectPaintingConfigStep() {
             </label>
             <div className="space-y-2">
               {PAINTING_ADDONS.slice(0, 6).map((addon) => {
-                const isSelected = addons.some((a) => a.id === addon.id);
+                const selectedAddon = addons.find((a) => a.id === addon.id);
+                const isSelected = !!selectedAddon;
                 return (
                   <label
                     key={addon.id}
@@ -214,12 +223,42 @@ export function ProjectPaintingConfigStep() {
                       />
                       <span className="text-gray-900">{addon.label}</span>
                     </div>
-                    <span className="text-sm text-gray-500">
-                      ${addon.price}/{addon.unit}
-                    </span>
+                    {isSelected ? (
+                      <InlineOverrideInput
+                        value={selectedAddon.priceOverride ?? addon.price}
+                        defaultValue={addon.price}
+                        override={selectedAddon.priceOverride}
+                        onOverrideChange={(override) =>
+                          setAddonPriceOverride(addon.id, override)
+                        }
+                        suffix={`/${addon.unit}`}
+                      />
+                    ) : (
+                      <span className="text-sm text-gray-500">
+                        ${addon.price}/{addon.unit}
+                      </span>
+                    )}
                   </label>
                 );
               })}
+            </div>
+
+            {/* Custom Add-ons */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Custom Add-ons
+              </label>
+              <div className="space-y-2">
+                {customAddons.map((addon) => (
+                  <CustomAddonCard
+                    key={addon.id}
+                    addon={addon}
+                    onUpdate={(updates) => updateCustomAddon(addon.id, updates)}
+                    onRemove={() => removeCustomAddon(addon.id)}
+                  />
+                ))}
+                <CustomAddonInput onAdd={addCustomAddon} />
+              </div>
             </div>
           </div>
         </div>

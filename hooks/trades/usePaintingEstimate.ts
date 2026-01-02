@@ -20,6 +20,12 @@ import {
   UsePaintingEstimateReturn,
 } from "@/lib/trades/painting/types";
 import { TradeRoomView } from "@/lib/project/types";
+import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
+
+// Generate unique ID
+function generateId(): string {
+  return `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 export function usePaintingEstimate(): UsePaintingEstimateReturn {
   const { profile } = useAuth();
@@ -30,6 +36,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
   const [surfacePrep, setSurfacePrep] = useState<PaintingSurfacePrep>("light");
   const [complexity, setComplexity] = useState<PaintingComplexity>("standard");
   const [addons, setAddons] = useState<PaintingSelectedAddon[]>([]);
+  const [customAddons, setCustomAddons] = useState<CustomAddon[]>([]);
   const [totalSqft, setTotalSqft] = useState<number>(0);
   const [wallSqft, setWallSqft] = useState<number>(0);
   const [ceilingSqft, setCeilingSqft] = useState<number>(0);
@@ -80,7 +87,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
         const price = getUserPaintingAddonPrice(addonId, customRates);
         const total = addonDef.unit === "flat" ? price : price * quantity;
 
-        return [...prev, { id: addonId, quantity, total }];
+        return [...prev, { id: addonId, quantity, total, hasOverride: false }];
       });
     },
     [customRates]
@@ -94,7 +101,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
           const addonDef = PAINTING_ADDONS.find((a) => a.id === addonId);
           if (!addonDef) return addon;
 
-          const price = getUserPaintingAddonPrice(addonId, customRates);
+          const price = addon.priceOverride ?? getUserPaintingAddonPrice(addonId, customRates);
           const total = addonDef.unit === "flat" ? price : price * quantity;
 
           return { ...addon, quantity, total };
@@ -108,6 +115,65 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     setAddons((prev) => prev.filter((a) => a.id !== addonId));
   }, []);
 
+  const setAddonPriceOverride = useCallback(
+    (addonId: PaintingAddonId, override: number | undefined) => {
+      setAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== addonId) return addon;
+          const addonDef = PAINTING_ADDONS.find((a) => a.id === addonId);
+          if (!addonDef) return addon;
+
+          const price = override ?? getUserPaintingAddonPrice(addonId, customRates);
+          const total = addonDef.unit === "flat" ? price : price * addon.quantity;
+
+          return {
+            ...addon,
+            priceOverride: override,
+            hasOverride: override !== undefined,
+            total,
+          };
+        })
+      );
+    },
+    [customRates]
+  );
+
+  // Custom addon management
+  const addCustomAddon = useCallback(
+    (name: string, price: number, unit: AddonUnit, quantity: number = 1) => {
+      const total = unit === "flat" ? price : price * quantity;
+      const newAddon: CustomAddon = {
+        id: generateId(),
+        name,
+        price,
+        unit,
+        quantity,
+        total,
+        isCustom: true,
+      };
+      setCustomAddons((prev) => [...prev, newAddon]);
+    },
+    []
+  );
+
+  const updateCustomAddon = useCallback(
+    (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => {
+      setCustomAddons((prev) =>
+        prev.map((addon) => {
+          if (addon.id !== id) return addon;
+          const updated = { ...addon, ...updates };
+          updated.total = updated.unit === "flat" ? updated.price : updated.price * updated.quantity;
+          return updated;
+        })
+      );
+    },
+    []
+  );
+
+  const removeCustomAddon = useCallback((id: string) => {
+    setCustomAddons((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
   // Reset all state
   const reset = useCallback(() => {
     setCoatCount(2);
@@ -115,6 +181,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     setSurfacePrep("light");
     setComplexity("standard");
     setAddons([]);
+    setCustomAddons([]);
     setTotalSqft(0);
     setWallSqft(0);
     setCeilingSqft(0);
@@ -122,7 +189,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
 
   // Calculate totals
   const totals = useMemo(() => {
-    return calculatePaintingEstimate({
+    const baseTotals = calculatePaintingEstimate({
       wallSqft,
       ceilingSqft,
       coatCount,
@@ -132,6 +199,29 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
       addons,
       rates: defaultRates,
     });
+
+    // Add custom addons to totals
+    const customAddonsTotal = customAddons.reduce((sum, a) => sum + a.total, 0);
+    if (customAddonsTotal > 0) {
+      const newAddonsSubtotal = baseTotals.addonsSubtotal + customAddonsTotal;
+      const newSubtotal = baseTotals.subtotal + customAddonsTotal;
+      const newComplexityAdjustment = newSubtotal * (baseTotals.complexityMultiplier - 1);
+      const newTotal = newSubtotal + newComplexityAdjustment;
+      const newCostPerSqft = baseTotals.totalSqft > 0 ? newTotal / baseTotals.totalSqft : 0;
+
+      return {
+        ...baseTotals,
+        addonsSubtotal: newAddonsSubtotal,
+        subtotal: newSubtotal,
+        complexityAdjustment: newComplexityAdjustment,
+        total: newTotal,
+        costPerSqft: newCostPerSqft,
+        rangeLow: newTotal * 0.85,
+        rangeHigh: newTotal * 1.15,
+      };
+    }
+
+    return baseTotals;
   }, [
     wallSqft,
     ceilingSqft,
@@ -140,6 +230,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     surfacePrep,
     complexity,
     addons,
+    customAddons,
     defaultRates,
   ]);
 
@@ -150,6 +241,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     surfacePrep,
     complexity,
     addons,
+    customAddons,
     totalSqft,
     wallSqft,
     ceilingSqft,
@@ -165,6 +257,10 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     toggleAddon,
     updateAddonQuantity,
     removeAddon,
+    setAddonPriceOverride,
+    addCustomAddon,
+    updateCustomAddon,
+    removeCustomAddon,
     setTotalSqft,
     setWallSqft,
     setCeilingSqft,

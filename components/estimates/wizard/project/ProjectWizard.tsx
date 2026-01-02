@@ -12,11 +12,17 @@ import {
 } from "./ProjectEstimateContext";
 import { ProjectTradeSelectionStep } from "./ProjectTradeSelectionStep";
 import { ProjectRoomsStep } from "./ProjectRoomsStep";
-import { ProjectHangingConfigStep } from "./ProjectHangingConfigStep";
-import { ProjectFinishingConfigStep } from "./ProjectFinishingConfigStep";
 import { ProjectPaintingConfigStep } from "./ProjectPaintingConfigStep";
 import { ProjectCombinedPreview } from "./ProjectCombinedPreview";
 import { ProjectSendEstimate } from "./ProjectSendEstimate";
+// Standalone hanging steps
+import { HangingSheetTypeStep } from "../trades/hanging/HangingSheetTypeStep";
+import { HangingComplexityStep } from "../trades/hanging/HangingComplexityStep";
+import { HangingAddonsStep } from "../trades/hanging/HangingAddonsStep";
+// Standalone finishing steps
+import { DrywallFinishLevelStep } from "../trades/drywall/DrywallFinishLevelStep";
+import { DrywallComplexityStep } from "../trades/drywall/DrywallComplexityStep";
+import { DrywallAddonsStep } from "../trades/drywall/DrywallAddonsStep";
 import { DrywallMaterialsStep } from "../trades/drywall/DrywallMaterialsStep";
 
 // Step type
@@ -29,8 +35,17 @@ const BASE_STEPS: Step[] = [{ label: "Trades" }, { label: "Rooms" }];
 
 // Trade-specific step labels (arrays to support multiple steps per trade)
 const TRADE_STEP_LABELS: Record<string, Step[]> = {
-  drywall_hanging: [{ label: "Hanging" }],
-  drywall_finishing: [{ label: "Finishing" }, { label: "Materials" }],
+  drywall_hanging: [
+    { label: "Sheets" },
+    { label: "Complexity" },
+    { label: "Add-ons" },
+  ],
+  drywall_finishing: [
+    { label: "Finish" },
+    { label: "Complexity" },
+    { label: "Add-ons" },
+    { label: "Materials" },
+  ],
   painting: [{ label: "Painting" }],
 };
 
@@ -71,7 +86,8 @@ function ProjectWizardWrapper({
 
 // Inner wizard that can access context
 function ProjectWizardInner() {
-  const { enabledTrades, finishingEstimate } = useProjectEstimateContext();
+  const { enabledTrades, hangingEstimate, finishingEstimate } =
+    useProjectEstimateContext();
 
   // Build dynamic step configuration based on enabled trades
   const steps = useMemo(() => {
@@ -94,16 +110,32 @@ function ProjectWizardInner() {
           {/* Step 1: Rooms */}
           <ProjectRoomsStep />
 
-          {/* Dynamic trade config steps */}
+          {/* Dynamic hanging steps */}
           {enabledTrades.includes("drywall_hanging") && (
-            <ProjectHangingConfigStep />
+            <HangingSheetTypeStep hangingEstimate={hangingEstimate} />
+          )}
+          {enabledTrades.includes("drywall_hanging") && (
+            <HangingComplexityStep hangingEstimate={hangingEstimate} />
+          )}
+          {enabledTrades.includes("drywall_hanging") && (
+            <HangingAddonsStep hangingEstimate={hangingEstimate} />
+          )}
+
+          {/* Dynamic finishing steps */}
+          {enabledTrades.includes("drywall_finishing") && (
+            <DrywallFinishLevelStep finishingEstimate={finishingEstimate} />
           )}
           {enabledTrades.includes("drywall_finishing") && (
-            <ProjectFinishingConfigStep />
+            <DrywallComplexityStep finishingEstimate={finishingEstimate} />
+          )}
+          {enabledTrades.includes("drywall_finishing") && (
+            <DrywallAddonsStep finishingEstimate={finishingEstimate} />
           )}
           {enabledTrades.includes("drywall_finishing") && (
             <DrywallMaterialsStep finishingEstimate={finishingEstimate} />
           )}
+
+          {/* Painting step (consolidated - no standalone steps exist yet) */}
           {enabledTrades.includes("painting") && <ProjectPaintingConfigStep />}
 
           {/* Final steps */}
