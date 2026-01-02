@@ -22,14 +22,15 @@ import {
   FINISHING_CORNER_BEAD_TYPES,
   FINISHING_OTHER_MATERIALS,
 } from "@/lib/trades/drywallFinishing/constants";
-import {
-  FinishingMaterialId,
-  FinishingMaterialCategory,
-} from "@/lib/trades/drywallFinishing/types";
+import { FinishingMaterialCategory } from "@/lib/trades/drywallFinishing/types";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { InlineOverrideInput } from "@/components/ui/InlineOverrideInput";
-import { useContractorMaterials } from "@/hooks/useContractorMaterials";
+import { CustomMaterialInput } from "@/components/ui/CustomMaterialInput";
+import {
+  useContractorMaterials,
+  usePresetsWithOverrides,
+} from "@/hooks/useContractorMaterials";
 
 // Icon mapping for categories
 const CategoryIcon = ({
@@ -93,7 +94,6 @@ export function DrywallMaterialsStep({
 
   const {
     materials,
-    addMaterial,
     addCustomMaterial,
     updateMaterial,
     removeMaterial,
@@ -103,6 +103,11 @@ export function DrywallMaterialsStep({
 
   // Fetch custom materials
   const { data: customMaterials = [] } = useContractorMaterials();
+
+  // Fetch database presets with contractor's price overrides
+  const { data: presetsData } = usePresetsWithOverrides();
+  const dbPresets = presetsData?.presets ?? [];
+  const presetOverrides = presetsData?.overrides ?? new Map();
 
   // Track which category is expanded
   const [expandedCategory, setExpandedCategory] =
@@ -118,11 +123,6 @@ export function DrywallMaterialsStep({
     });
     return () => setFooterConfig(null);
   }, [setFooterConfig, handleContinue, materials.length]);
-
-  const handleAddMaterial = (materialId: FinishingMaterialId) => {
-    addMaterial(materialId, 1);
-    setExpandedCategory(null);
-  };
 
   const handleAddCustomMaterial = (material: {
     id: string;
@@ -142,34 +142,83 @@ export function DrywallMaterialsStep({
     setExpandedCategory(null);
   };
 
-  // Get custom materials for a category
+  // Handler for adding inline custom materials (one-off, not from database)
+  const handleAddInlineMaterial = useCallback(
+    (
+      name: string,
+      price: number,
+      unit: string,
+      category: FinishingMaterialCategory
+    ) => {
+      addCustomMaterial(
+        `inline_${crypto.randomUUID()}`,
+        name,
+        category,
+        unit,
+        price,
+        1
+      );
+      setExpandedCategory(null);
+    },
+    [addCustomMaterial]
+  );
+
+  // Get custom materials for a category (user-created, not preset overrides)
   const getCustomMaterialsForCategory = (
     category: FinishingMaterialCategory
   ) => {
     return customMaterials.filter((m) => {
       const mappedCategory = mapToFinishingCategory(m.category);
-      return mappedCategory === category;
+      // Only include truly custom materials (not preset overrides)
+      return mappedCategory === category && !m.isPresetOverride;
     });
   };
 
-  // Get preset materials for a category, hiding ones that have custom overrides
-  const getFilteredPresetMaterials = (category: FinishingMaterialCategory) => {
-    const presets = getMaterialsByCategory(category);
-    const categoryCustom = getCustomMaterialsForCategory(category);
+  // Get database presets for a category with price overrides applied
+  const getDbPresetsForCategory = (category: FinishingMaterialCategory) => {
+    // Filter database presets by category
+    const categoryPresets = dbPresets.filter((p) => {
+      const mappedCategory = mapToFinishingCategory(p.category);
+      return mappedCategory === category;
+    });
 
-    // Build a set of preset IDs that have custom overrides
-    const overriddenPresetIds = new Set<string>();
-    for (const custom of categoryCustom) {
-      // If custom material has a presetId, it's an override
-      if (custom.presetId) {
-        overriddenPresetIds.add(custom.presetId);
-      }
-      // Also hide presets that match by ID (direct replacement)
-      overriddenPresetIds.add(custom.id);
+    // Apply overrides to get final prices
+    return categoryPresets.map((preset) => {
+      const override = presetOverrides.get(preset.id);
+      return {
+        ...preset,
+        basePrice: override ? override.basePrice : preset.basePrice,
+        hasOverride: !!override,
+      };
+    });
+  };
+
+  // Get preset materials for a category - prefer database presets, fall back to constants
+  const getFilteredPresetMaterials = (category: FinishingMaterialCategory) => {
+    // Use database presets if available
+    const categoryDbPresets = getDbPresetsForCategory(category);
+    if (categoryDbPresets.length > 0) {
+      return categoryDbPresets;
     }
 
-    // Filter out presets that have been overridden
-    return presets.filter((preset) => !overriddenPresetIds.has(preset.id));
+    // Fall back to hardcoded constants if no database presets
+    return getMaterialsByCategory(category).map((preset) => ({
+      id: preset.id,
+      name: preset.label,
+      category: category,
+      unit: preset.unit,
+      unitSize: (preset as { unitSize?: string }).unitSize || null,
+      basePrice: preset.price,
+      description: preset.description,
+      hasOverride: false,
+      isPreset: true,
+      isPresetOverride: false,
+      isActive: true,
+      contractorId: null,
+      presetId: null,
+      createdAt: null,
+      updatedAt: null,
+    }));
   };
 
   const handleQuantityChange = (id: string, delta: number) => {
@@ -203,28 +252,12 @@ export function DrywallMaterialsStep({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "w-10 h-10 rounded-lg flex items-center justify-center",
-                        entry.isCustom
-                          ? "bg-amber-100 text-amber-600"
-                          : "bg-blue-100 text-blue-600"
-                      )}
-                    >
-                      {entry.isCustom ? (
-                        <Star className="w-5 h-5" />
-                      ) : (
-                        <CategoryIcon category={entry.category} />
-                      )}
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100 text-blue-600">
+                      <CategoryIcon category={entry.category} />
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900 flex items-center gap-1.5">
+                      <div className="font-medium text-gray-900">
                         {entry.name}
-                        {entry.isCustom && (
-                          <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                            Custom
-                          </span>
-                        )}
                       </div>
                       <div className="text-sm text-gray-500">{entry.unit}</div>
                     </div>
@@ -395,31 +428,64 @@ export function DrywallMaterialsStep({
                       )}
                     </>
                   )}
-                  {/* Preset materials */}
+                  {/* Preset materials from database */}
                   {categoryMaterials.map((material) => (
                     <button
                       key={material.id}
                       onClick={() =>
-                        handleAddMaterial(material.id as FinishingMaterialId)
+                        handleAddCustomMaterial({
+                          id: material.id,
+                          name: material.name,
+                          category: material.category,
+                          unit: material.unit,
+                          basePrice: material.basePrice,
+                        })
                       }
-                      className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-blue-50 transition-colors"
+                      className={cn(
+                        "w-full flex items-center justify-between p-3 rounded-lg transition-colors",
+                        material.hasOverride
+                          ? "bg-blue-50 hover:bg-blue-100"
+                          : "hover:bg-blue-50"
+                      )}
                     >
                       <div className="text-left">
                         <div className="font-medium text-gray-900">
-                          {material.label}
+                          {material.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {material.description}
+                          {material.description ||
+                            `${material.unitSize || ""} ${
+                              material.unit
+                            }`.trim()}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700">
-                          ${material.price.toFixed(2)}/{material.unit}
+                        <span
+                          className={cn(
+                            "text-sm font-medium",
+                            material.hasOverride
+                              ? "text-blue-700"
+                              : "text-gray-700"
+                          )}
+                        >
+                          ${material.basePrice.toFixed(2)}/{material.unit}
                         </span>
                         <Plus className="w-5 h-5 text-blue-600" />
                       </div>
                     </button>
                   ))}
+
+                  {/* Add custom material inline */}
+                  <CustomMaterialInput
+                    onAdd={(name, price, unit) =>
+                      handleAddInlineMaterial(
+                        name,
+                        price,
+                        unit,
+                        category.id as FinishingMaterialCategory
+                      )
+                    }
+                  />
                 </div>
               )}
             </div>
