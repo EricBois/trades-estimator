@@ -1,8 +1,13 @@
-import { PAINTING_RATES, PAINTING_ADDONS } from "./constants";
+import {
+  PAINTING_RATES,
+  PAINTING_ADDONS,
+  PAINTING_COMPLEXITY_MULTIPLIERS,
+} from "./constants";
 import {
   CustomRates,
   PaintingRates,
   PaintingAddonPrices,
+  TradeComplexity,
 } from "@/hooks/useProfile";
 
 // Rate type keys that can be customized
@@ -153,4 +158,32 @@ export function getPaintingRateRangeInfo(rateType: PaintingRateType): {
     ...range,
     ...labels[rateType],
   };
+}
+
+/**
+ * Get user's custom complexity multipliers or fall back to defaults
+ */
+export function getUserPaintingComplexity(
+  customRates: CustomRates | null | undefined
+): TradeComplexity {
+  const userComplexity = customRates?.painting_complexity;
+  return {
+    simple: userComplexity?.simple ?? PAINTING_COMPLEXITY_MULTIPLIERS.simple,
+    standard:
+      userComplexity?.standard ?? PAINTING_COMPLEXITY_MULTIPLIERS.standard,
+    complex: userComplexity?.complex ?? PAINTING_COMPLEXITY_MULTIPLIERS.complex,
+  };
+}
+
+/**
+ * Get the complexity multiplier for a specific complexity level
+ */
+export function getPaintingComplexityMultiplier(
+  complexity: "simple" | "standard" | "complex",
+  customRates: CustomRates | null | undefined
+): number {
+  const userComplexity = getUserPaintingComplexity(customRates);
+  return (
+    userComplexity[complexity] ?? PAINTING_COMPLEXITY_MULTIPLIERS[complexity]
+  );
 }

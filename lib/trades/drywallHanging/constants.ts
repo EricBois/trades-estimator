@@ -6,13 +6,14 @@ export const DRYWALL_SHEET_SIZES = [
 ] as const;
 
 // Sheet types with thicknesses and default costs
+// laborMultiplier accounts for installation difficulty (1.0 = standard, higher = harder)
 export const DRYWALL_SHEET_TYPES = [
   {
     id: "standard_half",
     label: 'Standard 1/2"',
     thickness: 0.5,
     materialCost: 12,
-    laborCost: 10,
+    laborMultiplier: 1.0,
     icon: "Square",
   },
   {
@@ -20,7 +21,7 @@ export const DRYWALL_SHEET_TYPES = [
     label: 'Standard 5/8"',
     thickness: 0.625,
     materialCost: 15,
-    laborCost: 11,
+    laborMultiplier: 1.1,
     icon: "Square",
   },
   {
@@ -28,7 +29,7 @@ export const DRYWALL_SHEET_TYPES = [
     label: 'Lightweight 1/2"',
     thickness: 0.5,
     materialCost: 14,
-    laborCost: 10,
+    laborMultiplier: 1.0,
     icon: "Feather",
   },
   {
@@ -36,7 +37,7 @@ export const DRYWALL_SHEET_TYPES = [
     label: 'Moisture Resistant 1/2"',
     thickness: 0.5,
     materialCost: 18,
-    laborCost: 12,
+    laborMultiplier: 1.15,
     icon: "Droplet",
   },
   {
@@ -44,7 +45,7 @@ export const DRYWALL_SHEET_TYPES = [
     label: 'Moisture Resistant 5/8"',
     thickness: 0.625,
     materialCost: 20,
-    laborCost: 13,
+    laborMultiplier: 1.2,
     icon: "Droplet",
   },
   {
@@ -52,7 +53,7 @@ export const DRYWALL_SHEET_TYPES = [
     label: 'Fire-Rated (Type X) 5/8"',
     thickness: 0.625,
     materialCost: 16,
-    laborCost: 12,
+    laborMultiplier: 1.15,
     icon: "Flame",
   },
   {
@@ -60,7 +61,7 @@ export const DRYWALL_SHEET_TYPES = [
     label: 'Soundproof 5/8"',
     thickness: 0.625,
     materialCost: 55,
-    laborCost: 15,
+    laborMultiplier: 1.4,
     icon: "Volume2",
   },
   {
@@ -68,7 +69,7 @@ export const DRYWALL_SHEET_TYPES = [
     label: 'Mold Resistant 1/2"',
     thickness: 0.5,
     materialCost: 18,
-    laborCost: 12,
+    laborMultiplier: 1.15,
     icon: "Shield",
   },
 ] as const;
@@ -204,7 +205,6 @@ export const DEFAULT_L_SHAPE_DIMENSIONS = {
 
 // Industry rate ranges (for settings display)
 export const HANGING_RATES = {
-  labor_per_sheet: { low: 8, mid: 12, high: 18 },
   labor_per_sqft: { low: 0.5, mid: 0.85, high: 1.5 },
   material_markup: { low: 0, mid: 15, high: 30 }, // percentage
 } as const;

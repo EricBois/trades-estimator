@@ -12,15 +12,20 @@ import {
   Star,
 } from "lucide-react";
 import {
-  useContractorMaterials,
+  useContractorMaterialsByTrade,
   useCreateContractorMaterial,
   useUpdateContractorMaterial,
   useDeleteContractorMaterial,
-  MATERIAL_CATEGORIES,
+  TRADE_MATERIAL_CATEGORIES,
   MaterialCategory,
+  Trade,
 } from "@/hooks/useContractorMaterials";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "@/components/ui/SettingsSection";
+
+interface CustomMaterialsSectionProps {
+  trade: Trade;
+}
 
 interface MaterialFormData {
   name: string;
@@ -31,20 +36,25 @@ interface MaterialFormData {
   description: string;
 }
 
-const defaultFormData: MaterialFormData = {
-  name: "",
-  category: "mud",
-  unit: "box",
-  unitSize: "",
-  basePrice: "",
-  description: "",
-};
-
-const CATEGORY_LABELS: Record<MaterialCategory, string> = {
+// Category labels for display
+const CATEGORY_LABELS: Record<string, string> = {
+  // Drywall Finishing
   mud: "Mud/Compound",
   tape: "Tape",
   corner_bead: "Corner Bead",
   primer: "Primer",
+  // Drywall Hanging
+  board: "Drywall Board",
+  fastener: "Fasteners",
+  trim: "Trim/Bead",
+  insulation: "Insulation",
+  // Painting
+  paint: "Paint",
+  supplies: "Supplies",
+  // Framing
+  lumber: "Lumber",
+  hardware: "Hardware",
+  // Common
   other: "Other",
 };
 
@@ -55,18 +65,37 @@ const COMMON_UNITS = [
   "pail",
   "bag",
   "piece",
+  "sheet",
   "linear ft",
+  "sqft",
+  "tube",
 ];
 
-export function CustomMaterialsSection() {
-  const { data: materials = [], isLoading } = useContractorMaterials(false);
+export function CustomMaterialsSection({ trade }: CustomMaterialsSectionProps) {
+  const { data: materials = [], isLoading } = useContractorMaterialsByTrade(
+    trade,
+    false
+  );
+  const tradeCategories = TRADE_MATERIAL_CATEGORIES[trade];
+  const defaultCategory = tradeCategories[0] as MaterialCategory;
   const createMaterial = useCreateContractorMaterial();
   const updateMaterial = useUpdateContractorMaterial();
   const deleteMaterial = useDeleteContractorMaterial();
 
+  const getDefaultFormData = (): MaterialFormData => ({
+    name: "",
+    category: defaultCategory,
+    unit: "box",
+    unitSize: "",
+    basePrice: "",
+    description: "",
+  });
+
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<MaterialFormData>(defaultFormData);
+  const [formData, setFormData] = useState<MaterialFormData>(
+    getDefaultFormData()
+  );
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleAdd = async () => {
@@ -74,6 +103,7 @@ export function CustomMaterialsSection() {
 
     await createMaterial.mutateAsync({
       name: formData.name,
+      trade: trade,
       category: formData.category,
       unit: formData.unit,
       unitSize: formData.unitSize || null,
@@ -81,7 +111,7 @@ export function CustomMaterialsSection() {
       description: formData.description || null,
     });
 
-    setFormData(defaultFormData);
+    setFormData(getDefaultFormData());
     setIsAdding(false);
   };
 
@@ -91,6 +121,7 @@ export function CustomMaterialsSection() {
     await updateMaterial.mutateAsync({
       id,
       name: formData.name,
+      trade: trade,
       category: formData.category,
       unit: formData.unit,
       unitSize: formData.unitSize || null,
@@ -98,13 +129,22 @@ export function CustomMaterialsSection() {
       description: formData.description || null,
     });
 
-    setFormData(defaultFormData);
+    setFormData(getDefaultFormData());
     setEditingId(null);
   };
 
   const handleDelete = async (id: string) => {
-    await deleteMaterial.mutateAsync(id);
-    setDeleteConfirmId(null);
+    console.log("handleDelete called with id:", id);
+    try {
+      console.log("Calling deleteMaterial.mutateAsync...");
+      await deleteMaterial.mutateAsync(id);
+      console.log("Delete successful");
+      setDeleteConfirmId(null);
+    } catch (error) {
+      console.error("Failed to delete material:", error);
+      // Reset the confirm state even on error
+      setDeleteConfirmId(null);
+    }
   };
 
   const startEdit = (material: (typeof materials)[0]) => {
@@ -121,7 +161,7 @@ export function CustomMaterialsSection() {
   };
 
   const cancelEdit = () => {
-    setFormData(defaultFormData);
+    setFormData(getDefaultFormData());
     setEditingId(null);
     setIsAdding(false);
   };
@@ -185,9 +225,9 @@ export function CustomMaterialsSection() {
                       }
                       className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {MATERIAL_CATEGORIES.map((cat) => (
+                      {tradeCategories.map((cat) => (
                         <option key={cat} value={cat}>
-                          {CATEGORY_LABELS[cat]}
+                          {CATEGORY_LABELS[cat] || cat}
                         </option>
                       ))}
                     </select>
@@ -355,9 +395,9 @@ export function CustomMaterialsSection() {
                 }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {MATERIAL_CATEGORIES.map((cat) => (
+                {tradeCategories.map((cat) => (
                   <option key={cat} value={cat}>
-                    {CATEGORY_LABELS[cat]}
+                    {CATEGORY_LABELS[cat] || cat}
                   </option>
                 ))}
               </select>
@@ -449,7 +489,7 @@ export function CustomMaterialsSection() {
           onClick={() => {
             setIsAdding(true);
             setEditingId(null);
-            setFormData(defaultFormData);
+            setFormData(getDefaultFormData());
           }}
           className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
         >

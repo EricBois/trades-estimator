@@ -18,6 +18,7 @@ import {
   DRYWALL_SHEET_TYPES,
   DRYWALL_SHEET_SIZES,
   WASTE_FACTORS,
+  HANGING_RATES,
 } from "@/lib/trades/drywallHanging/constants";
 import {
   DrywallSheetTypeId,
@@ -29,6 +30,7 @@ import { StepHeader } from "@/components/ui/StepHeader";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { SelectionPillGroup } from "@/components/ui/SelectionPill";
 import { CostSummary } from "@/components/ui/CostSummary";
+import { MaterialToggle } from "@/components/ui/MaterialToggle";
 
 // Icon mapping
 const ICONS: Record<string, React.ElementType> = {
@@ -68,6 +70,8 @@ export function HangingSheetTypeStep({
     removeSheet,
     calculateSheetsFromRooms,
     totals,
+    clientSuppliesMaterials,
+    setClientSuppliesMaterials,
   } = estimate;
 
   // Calculate sheets from rooms on first load if no sheets exist
@@ -152,6 +156,14 @@ export function HangingSheetTypeStep({
         )} sqft - tap to add, set quantities`}
       />
 
+      {/* Global Materials Toggle */}
+      <div className="mb-6">
+        <MaterialToggle
+          included={!clientSuppliesMaterials}
+          onChange={(include) => setClientSuppliesMaterials(!include)}
+        />
+      </div>
+
       {/* Sheet Types - Multi-select with quantity */}
       <div className="mb-6">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Sheet Types</h3>
@@ -200,7 +212,14 @@ export function HangingSheetTypeStep({
                       {type.label}
                     </div>
                     <div className="text-xs text-gray-500">
-                      ${type.materialCost + type.laborCost}/sheet
+                      $
+                      {(
+                        (clientSuppliesMaterials ? 0 : type.materialCost) +
+                        HANGING_RATES.labor_per_sqft.mid *
+                          sqftPerSheet *
+                          type.laborMultiplier
+                      ).toFixed(0)}
+                      /sheet{clientSuppliesMaterials && " (labor)"}
                     </div>
                   </div>
                   {isSelected && sheet && (
@@ -282,7 +301,7 @@ export function HangingSheetTypeStep({
       {/* Cost Summary */}
       {hasSelection && (
         <CostSummary
-          variant="blue"
+          variant={clientSuppliesMaterials ? "orange" : "blue"}
           className="mb-6"
           items={[
             { label: "Total Sheets", value: `${allocatedSheets} sheets` },
@@ -290,6 +309,9 @@ export function HangingSheetTypeStep({
               label: "Coverage",
               value: `${(allocatedSheets * sqftPerSheet).toFixed(0)} sqft`,
             },
+            ...(clientSuppliesMaterials
+              ? [{ label: "Pricing", value: "Labor only" }]
+              : []),
           ]}
           total={{ label: "Total", value: totals.subtotal }}
         />

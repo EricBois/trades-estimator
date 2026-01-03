@@ -7,10 +7,6 @@ import {
   Save,
   Loader2,
   Building2,
-  DollarSign,
-  Ruler,
-  Hammer,
-  Package,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { useUpdateProfile, CustomRates } from "@/hooks";
@@ -22,28 +18,39 @@ import {
 } from "@/lib/trades/drywallFinishing/constants";
 import {
   HANGING_RATES,
-  WASTE_FACTORS,
   HANGING_ADDONS,
 } from "@/lib/trades/drywallHanging/constants";
-import { Form } from "@/components/ui/Form";
 import {
-  SettingsTextInput,
-  SettingsInput,
-  SettingsSelect,
-} from "@/components/ui/FormInput";
+  PAINTING_RATES,
+  PAINTING_ADDONS,
+  PAINTING_COMPLEXITY_MULTIPLIERS,
+} from "@/lib/trades/painting/constants";
+import {
+  FRAMING_RATES,
+  FRAMING_ADDONS,
+  FRAMING_COMPLEXITY_MULTIPLIERS,
+} from "@/lib/trades/framing/constants";
+import { Form } from "@/components/ui/Form";
+import { SettingsTextInput, SettingsInput } from "@/components/ui/FormInput";
 import { SettingsSection } from "@/components/ui/SettingsSection";
 import { settingsSchema, SettingsFormData } from "@/lib/schemas/settingsSchema";
-import { CustomMaterialsSection } from "@/components/settings/CustomMaterialsSection";
-import { PresetMaterialPricesSection } from "@/components/settings/PresetMaterialPricesSection";
+import {
+  TradeNavigation,
+  TradeTab,
+} from "@/components/settings/TradeNavigation";
+import {
+  DrywallHangingSettings,
+  DrywallFinishingSettings,
+  PaintingSettings,
+  FramingSettings,
+} from "@/components/settings/trades";
 
-type SettingsTab = "profile" | "finishing" | "hanging" | "materials";
-
-const TABS: { id: SettingsTab; label: string; icon: typeof Building2 }[] = [
-  { id: "profile", label: "Profile", icon: Building2 },
-  { id: "finishing", label: "Finishing", icon: Ruler },
-  { id: "hanging", label: "Hanging", icon: Hammer },
-  { id: "materials", label: "Materials", icon: Package },
-];
+// Default complexity values
+const DEFAULT_COMPLEXITY = {
+  simple: 0.85,
+  standard: 1.0,
+  complex: 1.3,
+};
 
 interface SettingsContentProps {
   profile: {
@@ -59,22 +66,40 @@ export function SettingsContent({ profile }: SettingsContentProps) {
   const updateProfile = useUpdateProfile();
   const { refreshProfile } = useAuth();
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [activeTrade, setActiveTrade] = useState<TradeTab>("hanging");
 
+  // Helper functions for getting default addon prices
   const getDefaultAddonPrice = (id: string) =>
     DRYWALL_ADDONS.find((a) => a.id === id)?.price ?? 0;
   const getDefaultHangingAddonPrice = (id: string) =>
     HANGING_ADDONS.find((a) => a.id === id)?.price ?? 0;
+  const getDefaultPaintingAddonPrice = (id: string) =>
+    PAINTING_ADDONS.find((a) => a.id === id)?.price ?? 0;
+  const getDefaultFramingAddonPrice = (id: string) =>
+    FRAMING_ADDONS.find((a) => a.id === id)?.price ?? 0;
 
+  // Get existing rates from profile
   const existingRates = profile?.customRates?.drywall_finishing;
   const existingAddons = profile?.customRates?.drywall_addons;
   const existingHangingRates = profile?.customRates?.drywall_hanging;
   const existingHangingAddons = profile?.customRates?.drywall_hanging_addons;
+  const existingPaintingRates = profile?.customRates?.painting;
+  const existingPaintingAddons = profile?.customRates?.painting_addons;
+  const existingFramingRates = profile?.customRates?.framing;
+  const existingFramingAddons = profile?.customRates?.framing_addons;
+  const existingHangingComplexity =
+    profile?.customRates?.drywall_hanging_complexity;
+  const existingFinishingComplexity =
+    profile?.customRates?.drywall_finishing_complexity;
+  const existingPaintingComplexity = profile?.customRates?.painting_complexity;
+  const existingFramingComplexity = profile?.customRates?.framing_complexity;
 
   const defaultValues: SettingsFormData = {
+    // Profile
     companyName: profile?.companyName ?? "",
     hourlyRate: profile?.hourlyRate ?? undefined,
-    // Drywall rates
+
+    // Drywall Finishing rates
     sqftStandard:
       existingRates?.sqft_standard ?? DRYWALL_RATES.sqft_standard.mid,
     sqftPremium: existingRates?.sqft_premium ?? DRYWALL_RATES.sqft_premium.mid,
@@ -82,7 +107,8 @@ export function SettingsContent({ profile }: SettingsContentProps) {
       existingRates?.linear_joints ?? DRYWALL_RATES.linear_joints.mid,
     linearCorners:
       existingRates?.linear_corners ?? DRYWALL_RATES.linear_corners.mid,
-    // Drywall addons
+
+    // Drywall Finishing addons
     addonSanding: existingAddons?.sanding ?? getDefaultAddonPrice("sanding"),
     addonPrimer: existingAddons?.primer ?? getDefaultAddonPrice("primer"),
     addonRepairHoles:
@@ -93,17 +119,24 @@ export function SettingsContent({ profile }: SettingsContentProps) {
       existingAddons?.high_ceiling ?? getDefaultAddonPrice("high_ceiling"),
     addonDustBarrier:
       existingAddons?.dust_barrier ?? getDefaultAddonPrice("dust_barrier"),
-    // Hanging rates
-    hangingLaborPerSheet:
-      existingHangingRates?.labor_per_sheet ??
-      HANGING_RATES.labor_per_sheet.mid,
+
+    // Drywall Finishing complexity
+    finishingComplexitySimple:
+      existingFinishingComplexity?.simple ?? DEFAULT_COMPLEXITY.simple,
+    finishingComplexityStandard:
+      existingFinishingComplexity?.standard ?? DEFAULT_COMPLEXITY.standard,
+    finishingComplexityComplex:
+      existingFinishingComplexity?.complex ?? DEFAULT_COMPLEXITY.complex,
+
+    // Drywall Hanging rates
     hangingLaborPerSqft:
       existingHangingRates?.labor_per_sqft ?? HANGING_RATES.labor_per_sqft.mid,
     hangingMaterialMarkup:
       existingHangingRates?.material_markup ??
       HANGING_RATES.material_markup.mid,
     hangingDefaultWaste: existingHangingRates?.default_waste_factor ?? 0.12,
-    // Hanging addons
+
+    // Drywall Hanging addons
     hangingDelivery:
       existingHangingAddons?.delivery ??
       getDefaultHangingAddonPrice("delivery"),
@@ -122,14 +155,106 @@ export function SettingsContent({ profile }: SettingsContentProps) {
     hangingVaporBarrier:
       existingHangingAddons?.vapor_barrier ??
       getDefaultHangingAddonPrice("vapor_barrier"),
+
+    // Drywall Hanging complexity
+    hangingComplexitySimple:
+      existingHangingComplexity?.simple ?? DEFAULT_COMPLEXITY.simple,
+    hangingComplexityStandard:
+      existingHangingComplexity?.standard ?? DEFAULT_COMPLEXITY.standard,
+    hangingComplexityComplex:
+      existingHangingComplexity?.complex ?? DEFAULT_COMPLEXITY.complex,
+
+    // Painting rates
+    paintingLaborPerSqft:
+      existingPaintingRates?.labor_per_sqft ??
+      PAINTING_RATES.labor_per_sqft.mid,
+    paintingMaterialPerSqft:
+      existingPaintingRates?.material_per_sqft ??
+      PAINTING_RATES.material_per_sqft.mid,
+    paintingCeilingModifier:
+      existingPaintingRates?.ceiling_modifier ??
+      PAINTING_RATES.ceiling_modifier.mid,
+
+    // Painting addons
+    paintingTrimPaint:
+      existingPaintingAddons?.trim_paint ??
+      getDefaultPaintingAddonPrice("trim_paint"),
+    paintingDoorPaint:
+      existingPaintingAddons?.door_paint ??
+      getDefaultPaintingAddonPrice("door_paint"),
+    paintingCabinetPaint:
+      existingPaintingAddons?.cabinet_paint ??
+      getDefaultPaintingAddonPrice("cabinet_paint"),
+    paintingCeilingTexture:
+      existingPaintingAddons?.ceiling_texture ??
+      getDefaultPaintingAddonPrice("ceiling_texture"),
+    paintingAccentWall:
+      existingPaintingAddons?.accent_wall ??
+      getDefaultPaintingAddonPrice("accent_wall"),
+    paintingWallpaperRemoval:
+      existingPaintingAddons?.wallpaper_removal ??
+      getDefaultPaintingAddonPrice("wallpaper_removal"),
+    paintingHighCeiling:
+      existingPaintingAddons?.high_ceiling ??
+      getDefaultPaintingAddonPrice("high_ceiling"),
+    paintingFurnitureMoving:
+      existingPaintingAddons?.furniture_moving ??
+      getDefaultPaintingAddonPrice("furniture_moving"),
+
+    // Painting complexity
+    paintingComplexitySimple:
+      existingPaintingComplexity?.simple ??
+      PAINTING_COMPLEXITY_MULTIPLIERS.simple,
+    paintingComplexityStandard:
+      existingPaintingComplexity?.standard ??
+      PAINTING_COMPLEXITY_MULTIPLIERS.standard,
+    paintingComplexityComplex:
+      existingPaintingComplexity?.complex ??
+      PAINTING_COMPLEXITY_MULTIPLIERS.complex,
+
+    // Framing rates
+    framingLaborPerLinearFt:
+      existingFramingRates?.labor_per_linear_ft ??
+      FRAMING_RATES.labor_per_linear_ft.mid,
+    framingLaborPerSqft:
+      existingFramingRates?.labor_per_sqft ?? FRAMING_RATES.labor_per_sqft.mid,
+    framingMaterialMarkup:
+      existingFramingRates?.material_markup ??
+      FRAMING_RATES.material_markup.mid,
+
+    // Framing addons
+    framingBlocking:
+      existingFramingAddons?.blocking ??
+      getDefaultFramingAddonPrice("blocking"),
+    framingHeaderUpgrade:
+      existingFramingAddons?.header_upgrade ??
+      getDefaultFramingAddonPrice("header_upgrade"),
+    framingFireBlocking:
+      existingFramingAddons?.fire_blocking ??
+      getDefaultFramingAddonPrice("fire_blocking"),
+    framingDemolition:
+      existingFramingAddons?.demolition ??
+      getDefaultFramingAddonPrice("demolition"),
+
+    // Framing complexity
+    framingComplexitySimple:
+      existingFramingComplexity?.simple ??
+      FRAMING_COMPLEXITY_MULTIPLIERS.simple,
+    framingComplexityStandard:
+      existingFramingComplexity?.standard ??
+      FRAMING_COMPLEXITY_MULTIPLIERS.standard,
+    framingComplexityComplex:
+      existingFramingComplexity?.complex ??
+      FRAMING_COMPLEXITY_MULTIPLIERS.complex,
   };
 
   const handleSubmit = async (data: SettingsFormData) => {
     if (!profile) return;
 
-    // Preserve existing fields (like finishing_material_prices) when updating
+    // Build customRates object preserving existing fields
     const customRates: CustomRates = {
       ...profile.customRates,
+      // Drywall Finishing
       drywall_finishing: {
         sqft_standard: data.sqftStandard,
         sqft_premium: data.sqftPremium,
@@ -144,8 +269,13 @@ export function SettingsContent({ profile }: SettingsContentProps) {
         high_ceiling: data.addonHighCeiling,
         dust_barrier: data.addonDustBarrier,
       },
+      drywall_finishing_complexity: {
+        simple: data.finishingComplexitySimple,
+        standard: data.finishingComplexityStandard,
+        complex: data.finishingComplexityComplex,
+      },
+      // Drywall Hanging
       drywall_hanging: {
-        labor_per_sheet: data.hangingLaborPerSheet,
         labor_per_sqft: data.hangingLaborPerSqft,
         material_markup: data.hangingMaterialMarkup,
         default_waste_factor: data.hangingDefaultWaste,
@@ -157,6 +287,49 @@ export function SettingsContent({ profile }: SettingsContentProps) {
         corner_bead: data.hangingCornerBead,
         insulation: data.hangingInsulation,
         vapor_barrier: data.hangingVaporBarrier,
+      },
+      drywall_hanging_complexity: {
+        simple: data.hangingComplexitySimple,
+        standard: data.hangingComplexityStandard,
+        complex: data.hangingComplexityComplex,
+      },
+      // Painting
+      painting: {
+        labor_per_sqft: data.paintingLaborPerSqft,
+        material_per_sqft: data.paintingMaterialPerSqft,
+        ceiling_modifier: data.paintingCeilingModifier,
+      },
+      painting_addons: {
+        trim_paint: data.paintingTrimPaint,
+        door_paint: data.paintingDoorPaint,
+        cabinet_paint: data.paintingCabinetPaint,
+        ceiling_texture: data.paintingCeilingTexture,
+        accent_wall: data.paintingAccentWall,
+        wallpaper_removal: data.paintingWallpaperRemoval,
+        high_ceiling: data.paintingHighCeiling,
+        furniture_moving: data.paintingFurnitureMoving,
+      },
+      painting_complexity: {
+        simple: data.paintingComplexitySimple,
+        standard: data.paintingComplexityStandard,
+        complex: data.paintingComplexityComplex,
+      },
+      // Framing
+      framing: {
+        labor_per_linear_ft: data.framingLaborPerLinearFt,
+        labor_per_sqft: data.framingLaborPerSqft,
+        material_markup: data.framingMaterialMarkup,
+      },
+      framing_addons: {
+        blocking: data.framingBlocking,
+        header_upgrade: data.framingHeaderUpgrade,
+        fire_blocking: data.framingFireBlocking,
+        demolition: data.framingDemolition,
+      },
+      framing_complexity: {
+        simple: data.framingComplexitySimple,
+        standard: data.framingComplexityStandard,
+        complex: data.framingComplexityComplex,
       },
     };
 
@@ -185,7 +358,7 @@ export function SettingsContent({ profile }: SettingsContentProps) {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
@@ -194,30 +367,9 @@ export function SettingsContent({ profile }: SettingsContentProps) {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
           </div>
-          <p className="text-gray-500">Manage your account and preferences</p>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                type="button"
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-all",
-                  activeTab === tab.id
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            );
-          })}
+          <p className="text-gray-500">
+            Manage your rates and preferences by trade
+          </p>
         </div>
 
         <Form
@@ -226,309 +378,67 @@ export function SettingsContent({ profile }: SettingsContentProps) {
           onSubmit={handleSubmit}
         >
           <div className="space-y-6">
-            {/* Profile Tab */}
-            {activeTab === "profile" && (
-              <SettingsSection icon={Building2} title="Company Profile">
-                <div className="space-y-4">
-                  <SettingsTextInput
-                    name="companyName"
-                    label="Company Name"
-                    placeholder="Your Company Name"
-                  />
-                  <SettingsInput
-                    name="hourlyRate"
-                    label="Default Hourly Rate"
-                    unit="$/hr"
-                    step={0.01}
-                    placeholder="75.00"
-                    hint="Used for calculating estimate ranges"
-                  />
-                </div>
-              </SettingsSection>
-            )}
-
-            {/* Finishing Tab */}
-            {activeTab === "finishing" && (
-              <>
-                <SettingsSection
-                  icon={Ruler}
-                  title="Finishing Rates"
-                  description="Your default rates for drywall finishing"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <SettingsInput
-                      name="sqftStandard"
-                      label="Standard Area"
-                      unit="$/sqft"
-                      placeholder={String(DRYWALL_RATES.sqft_standard.mid)}
-                      hint={`Industry: $${DRYWALL_RATES.sqft_standard.low.toFixed(
-                        2
-                      )} - $${DRYWALL_RATES.sqft_standard.high.toFixed(2)}`}
-                    />
-                    <SettingsInput
-                      name="sqftPremium"
-                      label="Premium Area"
-                      unit="$/sqft"
-                      placeholder={String(DRYWALL_RATES.sqft_premium.mid)}
-                      hint={`Industry: $${DRYWALL_RATES.sqft_premium.low.toFixed(
-                        2
-                      )} - $${DRYWALL_RATES.sqft_premium.high.toFixed(2)}`}
-                    />
-                    <SettingsInput
-                      name="linearJoints"
-                      label="Joints (Tape & Mud)"
-                      unit="$/linear ft"
-                      placeholder={String(DRYWALL_RATES.linear_joints.mid)}
-                      hint={`Industry: $${DRYWALL_RATES.linear_joints.low.toFixed(
-                        2
-                      )} - $${DRYWALL_RATES.linear_joints.high.toFixed(2)}`}
-                    />
-                    <SettingsInput
-                      name="linearCorners"
-                      label="Corner Bead"
-                      unit="$/linear ft"
-                      placeholder={String(DRYWALL_RATES.linear_corners.mid)}
-                      hint={`Industry: $${DRYWALL_RATES.linear_corners.low.toFixed(
-                        2
-                      )} - $${DRYWALL_RATES.linear_corners.high.toFixed(2)}`}
-                    />
-                  </div>
-                </SettingsSection>
-
-                <SettingsSection
-                  icon={DollarSign}
-                  title="Finishing Add-ons"
-                  description="Default prices for common add-ons"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <SettingsInput
-                      name="addonSanding"
-                      label="Extra Sanding"
-                      unit="flat"
-                      step={1}
-                      placeholder={String(getDefaultAddonPrice("sanding"))}
-                      hint={`Default: $${getDefaultAddonPrice("sanding")}`}
-                    />
-                    <SettingsInput
-                      name="addonPrimer"
-                      label="Prime Coat"
-                      unit="$/sqft"
-                      placeholder={String(getDefaultAddonPrice("primer"))}
-                      hint={`Default: $${getDefaultAddonPrice("primer")}/sqft`}
-                    />
-                    <SettingsInput
-                      name="addonRepairHoles"
-                      label="Hole Repair"
-                      unit="$/each"
-                      step={1}
-                      placeholder={String(getDefaultAddonPrice("repair_holes"))}
-                      hint={`Default: $${getDefaultAddonPrice(
-                        "repair_holes"
-                      )}/each`}
-                    />
-                    <SettingsInput
-                      name="addonTextureMatch"
-                      label="Texture Matching"
-                      unit="flat"
-                      step={1}
-                      placeholder={String(
-                        getDefaultAddonPrice("texture_match")
-                      )}
-                      hint={`Default: $${getDefaultAddonPrice(
-                        "texture_match"
-                      )}`}
-                    />
-                    <SettingsInput
-                      name="addonHighCeiling"
-                      label="High Ceiling Premium"
-                      unit="$/sqft"
-                      placeholder={String(getDefaultAddonPrice("high_ceiling"))}
-                      hint={`Default: $${getDefaultAddonPrice(
-                        "high_ceiling"
-                      )}/sqft`}
-                    />
-                    <SettingsInput
-                      name="addonDustBarrier"
-                      label="Dust Barrier Setup"
-                      unit="flat"
-                      step={1}
-                      placeholder={String(getDefaultAddonPrice("dust_barrier"))}
-                      hint={`Default: $${getDefaultAddonPrice("dust_barrier")}`}
-                    />
-                  </div>
-                </SettingsSection>
-              </>
-            )}
-
-            {/* Hanging Tab */}
-            {activeTab === "hanging" && (
-              <>
-                <SettingsSection
-                  icon={Hammer}
-                  title="Hanging Rates"
-                  description="Your default rates for drywall installation"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <SettingsInput
-                      name="hangingLaborPerSheet"
-                      label="Labor Per Sheet"
-                      unit="$/sheet"
-                      step={0.5}
-                      placeholder={String(HANGING_RATES.labor_per_sheet.mid)}
-                      hint={`Industry: $${HANGING_RATES.labor_per_sheet.low} - $${HANGING_RATES.labor_per_sheet.high}`}
-                    />
-                    <SettingsInput
-                      name="hangingLaborPerSqft"
-                      label="Labor Per Sqft"
-                      unit="$/sqft"
-                      placeholder={String(HANGING_RATES.labor_per_sqft.mid)}
-                      hint={`Industry: $${HANGING_RATES.labor_per_sqft.low.toFixed(
-                        2
-                      )} - $${HANGING_RATES.labor_per_sqft.high.toFixed(2)}`}
-                    />
-                    <SettingsInput
-                      name="hangingMaterialMarkup"
-                      label="Material Markup"
-                      unit="%"
-                      max={100}
-                      step={1}
-                      placeholder={String(HANGING_RATES.material_markup.mid)}
-                      hint={`Industry: ${HANGING_RATES.material_markup.low}% - ${HANGING_RATES.material_markup.high}%`}
-                    />
-                    <SettingsSelect
-                      name="hangingDefaultWaste"
-                      label="Default Waste Factor"
-                      options={WASTE_FACTORS.map((wf) => ({
-                        value: wf.value,
-                        label: wf.label,
-                      }))}
-                      hint="Applied to calculated sheet quantities"
-                    />
-                  </div>
-                </SettingsSection>
-
-                <SettingsSection
-                  icon={DollarSign}
-                  title="Hanging Add-ons"
-                  description="Default prices for installation add-ons"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <SettingsInput
-                      name="hangingDelivery"
-                      label="Delivery"
-                      unit="flat"
-                      step={5}
-                      placeholder={String(
-                        getDefaultHangingAddonPrice("delivery")
-                      )}
-                      hint={`Default: $${getDefaultHangingAddonPrice(
-                        "delivery"
-                      )}`}
-                    />
-                    <SettingsInput
-                      name="hangingStocking"
-                      label="Stocking (Carry In)"
-                      unit="$/sqft"
-                      placeholder={String(
-                        getDefaultHangingAddonPrice("stocking")
-                      )}
-                      hint={`Default: $${getDefaultHangingAddonPrice(
-                        "stocking"
-                      )}/sqft`}
-                    />
-                    <SettingsInput
-                      name="hangingDebrisRemoval"
-                      label="Debris Removal"
-                      unit="flat"
-                      step={10}
-                      placeholder={String(
-                        getDefaultHangingAddonPrice("debris_removal")
-                      )}
-                      hint={`Default: $${getDefaultHangingAddonPrice(
-                        "debris_removal"
-                      )}`}
-                    />
-                    <SettingsInput
-                      name="hangingCornerBead"
-                      label="Corner Bead"
-                      unit="$/linear ft"
-                      step={0.25}
-                      placeholder={String(
-                        getDefaultHangingAddonPrice("corner_bead")
-                      )}
-                      hint={`Default: $${getDefaultHangingAddonPrice(
-                        "corner_bead"
-                      )}/linear ft`}
-                    />
-                    <SettingsInput
-                      name="hangingInsulation"
-                      label="Insulation (R-13)"
-                      unit="$/sqft"
-                      step={0.05}
-                      placeholder={String(
-                        getDefaultHangingAddonPrice("insulation")
-                      )}
-                      hint={`Default: $${getDefaultHangingAddonPrice(
-                        "insulation"
-                      )}/sqft`}
-                    />
-                    <SettingsInput
-                      name="hangingVaporBarrier"
-                      label="Vapor Barrier"
-                      unit="$/sqft"
-                      step={0.05}
-                      placeholder={String(
-                        getDefaultHangingAddonPrice("vapor_barrier")
-                      )}
-                      hint={`Default: $${getDefaultHangingAddonPrice(
-                        "vapor_barrier"
-                      )}/sqft`}
-                    />
-                  </div>
-                </SettingsSection>
-              </>
-            )}
-
-            {/* Materials Tab */}
-            {activeTab === "materials" && (
-              <div className="space-y-6">
-                <PresetMaterialPricesSection />
-                <CustomMaterialsSection />
+            {/* Profile Section - Always visible */}
+            <SettingsSection icon={Building2} title="Company Profile">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <SettingsTextInput
+                  name="companyName"
+                  label="Company Name"
+                  placeholder="Your Company Name"
+                />
+                <SettingsInput
+                  name="hourlyRate"
+                  label="Default Hourly Rate"
+                  unit="$/hr"
+                  step={0.01}
+                  placeholder="75.00"
+                  hint="Used for calculating estimate ranges"
+                />
               </div>
-            )}
+            </SettingsSection>
 
-            {/* Save Button - Always visible except on materials tab */}
-            {activeTab !== "materials" && (
-              <div className="flex items-center gap-4">
-                <button
-                  type="submit"
-                  disabled={updateProfile.isPending}
-                  className={cn(
-                    "flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium",
-                    "hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
-                    "disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  )}
-                >
-                  {updateProfile.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save Changes
-                    </>
-                  )}
-                </button>
+            {/* Trade Navigation */}
+            <TradeNavigation
+              activeTrade={activeTrade}
+              onTradeSelect={setActiveTrade}
+            />
 
-                {saveSuccess && (
-                  <span className="text-sm text-green-600 font-medium">
-                    Settings saved successfully!
-                  </span>
+            {/* Trade-specific settings */}
+            {activeTrade === "hanging" && <DrywallHangingSettings />}
+            {activeTrade === "finishing" && <DrywallFinishingSettings />}
+            {activeTrade === "painting" && <PaintingSettings />}
+            {activeTrade === "framing" && <FramingSettings />}
+
+            {/* Save Button */}
+            <div className="flex items-center gap-4 pt-4 border-t">
+              <button
+                type="submit"
+                disabled={updateProfile.isPending}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium",
+                  "hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
+                  "disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 )}
-              </div>
-            )}
+              >
+                {updateProfile.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save All Changes
+                  </>
+                )}
+              </button>
+
+              {saveSuccess && (
+                <span className="text-sm text-green-600 font-medium">
+                  Settings saved successfully!
+                </span>
+              )}
+            </div>
           </div>
         </Form>
       </div>

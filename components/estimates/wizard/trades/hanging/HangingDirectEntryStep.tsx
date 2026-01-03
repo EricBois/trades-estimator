@@ -50,6 +50,7 @@ interface SheetCardProps {
   onToggleMaterial: (include: boolean) => void;
   onMaterialOverride: (override: number | undefined) => void;
   onLaborOverride: (override: number | undefined) => void;
+  globalMaterialsExcluded?: boolean;
 }
 
 function SheetCard({
@@ -61,6 +62,7 @@ function SheetCard({
   onToggleMaterial,
   onMaterialOverride,
   onLaborOverride,
+  globalMaterialsExcluded = false,
 }: SheetCardProps) {
   const sheetType = DRYWALL_SHEET_TYPES.find((t) => t.id === sheet.typeId);
   const Icon = sheetType ? ICONS[sheetType.icon] || Square : Square;
@@ -118,13 +120,19 @@ function SheetCard({
         </button>
       </div>
 
-      {/* Material toggle */}
-      <div className="mb-4">
-        <MaterialToggle
-          included={sheet.includeMaterial}
-          onChange={onToggleMaterial}
-        />
-      </div>
+      {/* Material toggle - only show when global materials are included */}
+      {!globalMaterialsExcluded ? (
+        <div className="mb-4">
+          <MaterialToggle
+            included={sheet.includeMaterial}
+            onChange={onToggleMaterial}
+          />
+        </div>
+      ) : (
+        <div className="mb-4 text-sm text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+          Labor only (global setting)
+        </div>
+      )}
 
       {/* Quantity stepper */}
       <div className="flex items-center justify-between">
@@ -213,6 +221,8 @@ export function HangingDirectEntryStep() {
     setSheetIncludeMaterial,
     setSheetMaterialCostOverride,
     setSheetLaborCostOverride,
+    clientSuppliesMaterials,
+    setClientSuppliesMaterials,
   } = useHangingEstimate();
 
   const handleAddSheet = () => {
@@ -240,6 +250,14 @@ export function HangingDirectEntryStep() {
         description="Add drywall sheets and quantities"
       />
 
+      {/* Global Materials Toggle */}
+      <div className="mb-6">
+        <MaterialToggle
+          included={!clientSuppliesMaterials}
+          onChange={(include) => setClientSuppliesMaterials(!include)}
+        />
+      </div>
+
       {/* Sheet entries */}
       <div className="space-y-4 mb-4">
         {sheets.map((sheet) => (
@@ -259,6 +277,7 @@ export function HangingDirectEntryStep() {
             onLaborOverride={(override) =>
               setSheetLaborCostOverride(sheet.id, override)
             }
+            globalMaterialsExcluded={clientSuppliesMaterials}
           />
         ))}
       </div>
@@ -275,11 +294,14 @@ export function HangingDirectEntryStep() {
       {/* Total summary */}
       {sheets.length > 0 && (
         <CostSummary
-          variant="blue"
+          variant={clientSuppliesMaterials ? "orange" : "blue"}
           className="mt-6"
           items={[
             { label: "Total Sheets", value: `${totalSheets} sheets` },
             { label: "Coverage", value: `${totals.totalSqft.toFixed(0)} sqft` },
+            ...(clientSuppliesMaterials
+              ? [{ label: "Pricing", value: "Labor only" }]
+              : []),
           ]}
           total={{ label: "Total", value: totals.subtotal }}
         />

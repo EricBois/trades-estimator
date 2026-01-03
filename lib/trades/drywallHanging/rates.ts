@@ -1,26 +1,20 @@
-import { HANGING_RATES, HANGING_ADDONS, getSheetType } from "./constants";
+import {
+  HANGING_RATES,
+  HANGING_ADDONS,
+  getSheetType,
+  HANGING_COMPLEXITY_MULTIPLIERS,
+  DRYWALL_SHEET_SIZES,
+} from "./constants";
 import {
   CustomRates,
   DrywallHangingRates,
   DrywallHangingAddonPrices,
+  TradeComplexity,
 } from "@/hooks/useProfile";
 import { DrywallSheetTypeId } from "./types";
 
 // Rate type keys that can be customized
 export type HangingRateType = keyof typeof HANGING_RATES;
-
-/**
- * Get user's custom labor rate per sheet or fall back to industry mid rate
- */
-export function getUserLaborPerSheet(
-  customRates: CustomRates | null | undefined
-): number {
-  const userRate = customRates?.drywall_hanging?.labor_per_sheet;
-  if (userRate !== undefined && userRate !== null) {
-    return userRate;
-  }
-  return HANGING_RATES.labor_per_sheet.mid;
-}
 
 /**
  * Get user's custom labor rate per sqft or fall back to industry mid rate
@@ -68,7 +62,6 @@ export function getUserHangingRates(
   customRates: CustomRates | null | undefined
 ): DrywallHangingRates {
   return {
-    labor_per_sheet: getUserLaborPerSheet(customRates),
     labor_per_sqft: getUserLaborPerSqft(customRates),
     material_markup: getUserMaterialMarkup(customRates),
     default_waste_factor: getUserDefaultWasteFactor(customRates),
@@ -134,32 +127,34 @@ export function getSheetMaterialCost(
 }
 
 /**
- * Get labor cost for a sheet type (uses user's per-sheet rate or default from sheet type)
+ * Get labor cost for a sheet type
+ * Calculates from labor_per_sqft × sheet sqft × difficulty multiplier
+ * Default sheet size is 4x8 (32 sqft)
  */
 export function getSheetLaborCost(
   typeId: DrywallSheetTypeId,
-  customRates: CustomRates | null | undefined
+  customRates: CustomRates | null | undefined,
+  sheetSize: string = "4x8"
 ): number {
-  // If user has a custom labor_per_sheet rate, use it
-  const userLaborRate = customRates?.drywall_hanging?.labor_per_sheet;
-  if (userLaborRate !== undefined && userLaborRate !== null) {
-    return userLaborRate;
-  }
-
-  // Otherwise use the default labor cost from the sheet type
   const sheetType = getSheetType(typeId);
-  return sheetType?.laborCost ?? HANGING_RATES.labor_per_sheet.mid;
+  if (!sheetType) return 0;
+
+  // Get the sqft for this sheet size (default to 4x8 = 32 sqft)
+  const size = DRYWALL_SHEET_SIZES.find((s) => s.value === sheetSize);
+  const sqft = size?.sqft ?? 32;
+
+  // Calculate: labor_per_sqft × sqft × difficulty multiplier
+  const laborPerSqft = getUserLaborPerSqft(customRates);
+  const difficultyMultiplier = sheetType.laborMultiplier;
+
+  return laborPerSqft * sqft * difficultyMultiplier;
 }
 
 /**
  * Check if a rate has been customized by the user
  */
 export function isHangingRateCustomized(
-  rateType:
-    | "labor_per_sheet"
-    | "labor_per_sqft"
-    | "material_markup"
-    | "default_waste_factor",
+  rateType: "labor_per_sqft" | "material_markup" | "default_waste_factor",
   customRates: CustomRates | null | undefined
 ): boolean {
   const userRate = customRates?.drywall_hanging?.[rateType];
@@ -192,7 +187,6 @@ export function getHangingRateRangeInfo(rateType: HangingRateType): {
 } {
   const range = HANGING_RATES[rateType];
   const labels: Record<HangingRateType, { label: string; unit: string }> = {
-    labor_per_sheet: { label: "Labor per Sheet", unit: "$/sheet" },
     labor_per_sqft: { label: "Labor per Sqft", unit: "$/sqft" },
     material_markup: { label: "Material Markup", unit: "%" },
   };
@@ -223,12 +217,13 @@ export function getEffectiveSheetMaterialCost(
 export function getEffectiveSheetLaborCost(
   typeId: DrywallSheetTypeId,
   customRates: CustomRates | null | undefined,
-  override?: number
+  override?: number,
+  sheetSize: string = "4x8"
 ): number {
   if (override !== undefined) {
     return override;
   }
-  return getSheetLaborCost(typeId, customRates);
+  return getSheetLaborCost(typeId, customRates, sheetSize);
 }
 
 /**
@@ -243,4 +238,32 @@ export function getEffectiveAddonPrice(
     return override;
   }
   return getUserHangingAddonPrice(addonId, customRates);
+}
+
+/**
+ * Get user's custom complexity multipliers or fall back to defaults
+ */
+export function getUserHangingComplexity(
+  customRates: CustomRates | null | undefined
+): TradeComplexity {
+  const userComplexity = customRates?.drywall_hanging_complexity;
+  return {
+    simple: userComplexity?.simple ?? HANGING_COMPLEXITY_MULTIPLIERS.simple,
+    standard:
+      userComplexity?.standard ?? HANGING_COMPLEXITY_MULTIPLIERS.standard,
+    complex: userComplexity?.complex ?? HANGING_COMPLEXITY_MULTIPLIERS.complex,
+  };
+}
+
+/**
+ * Get the complexity multiplier for a specific complexity level
+ */
+export function getHangingComplexityMultiplier(
+  complexity: "simple" | "standard" | "complex",
+  customRates: CustomRates | null | undefined
+): number {
+  const userComplexity = getUserHangingComplexity(customRates);
+  return (
+    userComplexity[complexity] ?? HANGING_COMPLEXITY_MULTIPLIERS[complexity]
+  );
 }

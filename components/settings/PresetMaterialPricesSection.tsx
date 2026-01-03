@@ -3,28 +3,46 @@
 import { useState, useMemo } from "react";
 import { DollarSign, RotateCcw, Loader2, ChevronDown } from "lucide-react";
 import {
-  usePresetsWithOverrides,
+  usePresetsWithOverridesByTrade,
   useSetPresetOverride,
   useRemovePresetOverride,
   ContractorMaterial,
-} from "@/hooks";
+  Trade,
+  TRADE_MATERIAL_CATEGORIES,
+} from "@/hooks/useContractorMaterials";
 import { cn } from "@/lib/utils";
 import { SettingsSection } from "@/components/ui/SettingsSection";
 
-// Category labels for UI
+interface PresetMaterialPricesSectionProps {
+  trade: Trade;
+}
+
+// Category labels for UI (all trades)
 const CATEGORY_LABELS: Record<string, string> = {
+  // Drywall Finishing
   mud: "Joint Compound",
   tape: "Tape",
   corner_bead: "Corner Bead",
   primer: "Primer",
+  // Drywall Hanging
+  board: "Drywall Boards",
+  fastener: "Fasteners",
+  trim: "Trim/Bead",
+  insulation: "Insulation",
+  // Painting
+  paint: "Paint",
+  supplies: "Supplies",
+  // Framing
+  lumber: "Lumber",
+  hardware: "Hardware",
+  // Common
   other: "Other Materials",
 };
 
-// Category order for display
-const CATEGORY_ORDER = ["mud", "tape", "corner_bead", "primer", "other"];
-
-export function PresetMaterialPricesSection() {
-  const { data, isLoading } = usePresetsWithOverrides();
+export function PresetMaterialPricesSection({
+  trade,
+}: PresetMaterialPricesSectionProps) {
+  const { data, isLoading } = usePresetsWithOverridesByTrade(trade);
   const setOverride = useSetPresetOverride();
   const removeOverride = useRemovePresetOverride();
 
@@ -47,10 +65,13 @@ export function PresetMaterialPricesSection() {
     return grouped;
   }, [presets]);
 
-  // Get categories that have materials, in order
+  // Get categories that have materials, in order based on trade
+  const tradeCategories = TRADE_MATERIAL_CATEGORIES[trade];
   const categories = useMemo(() => {
-    return CATEGORY_ORDER.filter((cat) => materialsByCategory[cat]?.length > 0);
-  }, [materialsByCategory]);
+    return tradeCategories.filter(
+      (cat) => materialsByCategory[cat]?.length > 0
+    );
+  }, [materialsByCategory, tradeCategories]);
 
   const handleSaveOverride = async (presetId: string) => {
     const price = parseFloat(editValue);
@@ -117,9 +138,6 @@ export function PresetMaterialPricesSection() {
         {categories.map((categoryId) => {
           const isExpanded = expandedCategory === categoryId;
           const materials = materialsByCategory[categoryId] || [];
-          const overrideCount = materials.filter((m) =>
-            overrides.has(m.id)
-          ).length;
 
           return (
             <div
@@ -133,16 +151,9 @@ export function PresetMaterialPricesSection() {
                 }
                 className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">
-                    {CATEGORY_LABELS[categoryId] || categoryId}
-                  </span>
-                  {overrideCount > 0 && (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                      {overrideCount} custom
-                    </span>
-                  )}
-                </div>
+                <span className="font-medium text-gray-900">
+                  {CATEGORY_LABELS[categoryId] || categoryId}
+                </span>
                 <ChevronDown
                   className={cn(
                     "w-4 h-4 text-gray-400 transition-transform",

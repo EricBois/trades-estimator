@@ -25,7 +25,6 @@ export interface DrywallAddonPrices {
 
 // Drywall hanging (installation) rates
 export interface DrywallHangingRates {
-  labor_per_sheet?: number; // $/sheet
   labor_per_sqft?: number; // $/sqft
   material_markup?: number; // percentage (0-100)
   default_waste_factor?: number; // decimal (0.10 = 10%)
@@ -60,6 +59,28 @@ export interface PaintingAddonPrices {
   furniture_moving?: number; // flat
 }
 
+// Complexity multipliers per trade
+export interface TradeComplexity {
+  simple?: number; // default: 0.85
+  standard?: number; // default: 1.0
+  complex?: number; // default: 1.3
+}
+
+// Framing rates
+export interface FramingRates {
+  labor_per_linear_ft?: number; // $/linear ft of wall
+  labor_per_sqft?: number; // $/sqft for header/floor framing
+  material_markup?: number; // percentage (0-100)
+}
+
+// Framing add-on prices
+export interface FramingAddonPrices {
+  blocking?: number; // per piece
+  header_upgrade?: number; // per header
+  fire_blocking?: number; // per linear ft
+  demolition?: number; // per sqft
+}
+
 // Preset material price overrides (material ID -> custom price)
 export interface FinishingMaterialPrices {
   [materialId: string]: number;
@@ -74,6 +95,14 @@ export interface CustomRates {
   painting_addons?: PaintingAddonPrices;
   // Preset material price overrides
   finishing_material_prices?: FinishingMaterialPrices;
+  // Complexity multipliers per trade
+  drywall_hanging_complexity?: TradeComplexity;
+  drywall_finishing_complexity?: TradeComplexity;
+  painting_complexity?: TradeComplexity;
+  framing_complexity?: TradeComplexity;
+  // Framing trade
+  framing?: FramingRates;
+  framing_addons?: FramingAddonPrices;
 }
 
 export interface UpdateProfileInput {

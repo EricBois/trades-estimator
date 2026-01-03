@@ -3,11 +3,13 @@ import {
   DRYWALL_ADDONS,
   getMaterialRate,
   getLaborRate,
+  DRYWALL_COMPLEXITY_MULTIPLIERS,
 } from "./constants";
 import {
   CustomRates,
   DrywallFinishingRates,
   DrywallAddonPrices,
+  TradeComplexity,
 } from "@/hooks/useProfile";
 
 // Rate type keys that can be customized
@@ -197,4 +199,32 @@ export function getEffectiveLaborRate(
     return override;
   }
   return getUserLaborRate(rateType, customRates);
+}
+
+/**
+ * Get user's custom complexity multipliers or fall back to defaults
+ */
+export function getUserFinishingComplexity(
+  customRates: CustomRates | null | undefined
+): TradeComplexity {
+  const userComplexity = customRates?.drywall_finishing_complexity;
+  return {
+    simple: userComplexity?.simple ?? DRYWALL_COMPLEXITY_MULTIPLIERS.simple,
+    standard:
+      userComplexity?.standard ?? DRYWALL_COMPLEXITY_MULTIPLIERS.standard,
+    complex: userComplexity?.complex ?? DRYWALL_COMPLEXITY_MULTIPLIERS.complex,
+  };
+}
+
+/**
+ * Get the complexity multiplier for a specific complexity level
+ */
+export function getFinishingComplexityMultiplier(
+  complexity: "simple" | "standard" | "complex",
+  customRates: CustomRates | null | undefined
+): number {
+  const userComplexity = getUserFinishingComplexity(customRates);
+  return (
+    userComplexity[complexity] ?? DRYWALL_COMPLEXITY_MULTIPLIERS[complexity]
+  );
 }

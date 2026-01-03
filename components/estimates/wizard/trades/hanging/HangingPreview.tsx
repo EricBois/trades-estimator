@@ -29,6 +29,7 @@ export function HangingPreview() {
     totals,
     directSqft,
     defaultRates,
+    clientSuppliesMaterials,
   } = useHangingEstimate();
 
   // Configure footer with "Send to Homeowner" button
@@ -64,16 +65,37 @@ export function HangingPreview() {
       />
 
       {/* Big Total */}
-      <div className="bg-blue-600 rounded-2xl p-6 mb-6 text-center">
-        <div className="text-blue-200 text-sm mb-1">
-          {inputMode === "labor_only"
+      <div
+        className={cn(
+          "rounded-2xl p-6 mb-6 text-center",
+          clientSuppliesMaterials || inputMode === "labor_only"
+            ? "bg-orange-500"
+            : "bg-blue-600"
+        )}
+      >
+        <div
+          className={cn(
+            "text-sm mb-1",
+            clientSuppliesMaterials || inputMode === "labor_only"
+              ? "text-orange-100"
+              : "text-blue-200"
+          )}
+        >
+          {inputMode === "labor_only" || clientSuppliesMaterials
             ? "Labor Only Estimate"
             : "Total Estimate"}
         </div>
         <div className="text-5xl font-bold text-white mb-2">
           ${formatCurrency(totals.total)}
         </div>
-        <div className="flex justify-center gap-4 text-blue-200 text-sm">
+        <div
+          className={cn(
+            "flex justify-center gap-4 text-sm",
+            clientSuppliesMaterials || inputMode === "labor_only"
+              ? "text-orange-100"
+              : "text-blue-200"
+          )}
+        >
           <span>{totals.totalSqft.toFixed(0)} sqft</span>
           {inputMode !== "labor_only" && (
             <>
@@ -154,6 +176,14 @@ export function HangingPreview() {
               <h3 className="font-semibold text-gray-900">Drywall Sheets</h3>
               <EditButton onClick={() => goToStep(sheetTypeStepIndex)} />
             </div>
+
+            {/* Labor only indicator */}
+            {clientSuppliesMaterials && (
+              <div className="mb-3 text-sm text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+                Labor only - client supplies materials
+              </div>
+            )}
+
             <div className="space-y-2">
               {sheets.map((sheet) => {
                 const sheetType = DRYWALL_SHEET_TYPES.find(
@@ -181,12 +211,14 @@ export function HangingPreview() {
               )}
             </div>
             <div className="border-t border-gray-100 pt-2 mt-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Materials</span>
-                <span className="text-gray-900">
-                  ${formatCurrency(totals.materialSubtotal)}
-                </span>
-              </div>
+              {!clientSuppliesMaterials && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Materials</span>
+                  <span className="text-gray-900">
+                    ${formatCurrency(totals.materialSubtotal)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">
                   Labor
