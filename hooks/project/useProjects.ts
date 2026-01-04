@@ -31,8 +31,8 @@ function toProject(row: Tables<"projects">): Project {
 export interface CreateProjectInput {
   contractorId: string;
   name: string;
-  homeownerName: string;
-  homeownerEmail: string;
+  homeownerName?: string;
+  homeownerEmail?: string;
   homeownerPhone?: string;
   projectDescription?: string;
 }
@@ -100,10 +100,10 @@ export function useCreateProject() {
       const insert: TablesInsert<"projects"> = {
         contractor_id: input.contractorId,
         name: input.name,
-        homeowner_name: input.homeownerName,
-        homeowner_email: input.homeownerEmail,
-        homeowner_phone: input.homeownerPhone,
-        project_description: input.projectDescription,
+        homeowner_name: input.homeownerName ?? "",
+        homeowner_email: input.homeownerEmail ?? "",
+        homeowner_phone: input.homeownerPhone ?? null,
+        project_description: input.projectDescription ?? null,
         status: "draft",
       };
 

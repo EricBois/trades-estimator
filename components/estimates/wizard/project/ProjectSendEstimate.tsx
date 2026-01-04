@@ -68,8 +68,8 @@ export function ProjectSendEstimate() {
         projectDescription: notes || undefined,
       });
 
-      // 2. Save rooms to project
-      await roomsHook.saveRooms();
+      // 2. Save rooms to the new project
+      await roomsHook.saveRooms(project.id);
 
       // 3. Create estimates for each enabled trade
       for (const tradeType of enabledTrades) {

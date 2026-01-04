@@ -28,6 +28,8 @@ export function HangingPreview() {
     wasteFactor,
     totals,
     directSqft,
+    directHours,
+    hourlyRate,
     defaultRates,
     clientSuppliesMaterials,
   } = useHangingEstimate();
@@ -90,13 +92,19 @@ export function HangingPreview() {
         </div>
         <div
           className={cn(
-            "flex justify-center gap-4 text-sm",
+            "flex justify-center gap-4 text-sm flex-wrap",
             clientSuppliesMaterials || inputMode === "labor_only"
               ? "text-orange-100"
               : "text-blue-200"
           )}
         >
           <span>{totals.totalSqft.toFixed(0)} sqft</span>
+          {directHours > 0 && (
+            <>
+              <span>•</span>
+              <span>{directHours} hrs</span>
+            </>
+          )}
           {inputMode !== "labor_only" && (
             <>
               <span>•</span>
@@ -144,16 +152,34 @@ export function HangingPreview() {
               <EditButton onClick={() => goToStep(laborOnlyStepIndex)} />
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Square Footage</span>
-                <span className="text-gray-900">{directSqft} sqft</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Labor Rate</span>
-                <span className="text-gray-900">
-                  ${(defaultRates.labor_per_sqft ?? 0.35).toFixed(2)}/sqft
-                </span>
-              </div>
+              {directSqft > 0 && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Square Footage</span>
+                    <span className="text-gray-900">{directSqft} sqft</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Labor Rate</span>
+                    <span className="text-gray-900">
+                      ${(defaultRates.labor_per_sqft ?? 0.35).toFixed(2)}/sqft
+                    </span>
+                  </div>
+                </>
+              )}
+              {directHours > 0 && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Additional Hours</span>
+                    <span className="text-gray-900">{directHours} hrs</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Hourly Rate</span>
+                    <span className="text-gray-900">
+                      ${hourlyRate.toFixed(2)}/hr
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
             <div className="border-t border-gray-100 pt-2 mt-2">
               <div className="flex justify-between text-sm font-medium">
@@ -263,6 +289,34 @@ export function HangingPreview() {
               <span className="text-gray-700">Add-ons Total</span>
               <span className="text-gray-900">
                 ${formatCurrency(totals.addonsSubtotal)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Additional Hours (non-labor-only modes) */}
+        {inputMode !== "labor_only" && directHours > 0 && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Additional Hours</h3>
+              <EditButton onClick={() => goToStep(addonsStepIndex)} />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Hours</span>
+                <span className="text-gray-900">{directHours} hrs</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Rate</span>
+                <span className="text-gray-900">
+                  ${hourlyRate.toFixed(2)}/hr
+                </span>
+              </div>
+            </div>
+            <div className="border-t border-gray-100 pt-2 mt-2 flex justify-between font-medium">
+              <span className="text-gray-700">Hours Total</span>
+              <span className="text-gray-900">
+                ${formatCurrency(directHours * hourlyRate)}
               </span>
             </div>
           </div>

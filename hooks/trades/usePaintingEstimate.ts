@@ -40,6 +40,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
   const [totalSqft, setTotalSqft] = useState<number>(0);
   const [wallSqft, setWallSqft] = useState<number>(0);
   const [ceilingSqft, setCeilingSqft] = useState<number>(0);
+  const [directHours, setDirectHoursState] = useState<number>(0);
 
   // Get hourly rate from profile
   const hourlyRate = profile?.hourly_rate ?? 75;
@@ -101,7 +102,9 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
           const addonDef = PAINTING_ADDONS.find((a) => a.id === addonId);
           if (!addonDef) return addon;
 
-          const price = addon.priceOverride ?? getUserPaintingAddonPrice(addonId, customRates);
+          const price =
+            addon.priceOverride ??
+            getUserPaintingAddonPrice(addonId, customRates);
           const total = addonDef.unit === "flat" ? price : price * quantity;
 
           return { ...addon, quantity, total };
@@ -123,8 +126,10 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
           const addonDef = PAINTING_ADDONS.find((a) => a.id === addonId);
           if (!addonDef) return addon;
 
-          const price = override ?? getUserPaintingAddonPrice(addonId, customRates);
-          const total = addonDef.unit === "flat" ? price : price * addon.quantity;
+          const price =
+            override ?? getUserPaintingAddonPrice(addonId, customRates);
+          const total =
+            addonDef.unit === "flat" ? price : price * addon.quantity;
 
           return {
             ...addon,
@@ -157,12 +162,18 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
   );
 
   const updateCustomAddon = useCallback(
-    (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => {
+    (
+      id: string,
+      updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>
+    ) => {
       setCustomAddons((prev) =>
         prev.map((addon) => {
           if (addon.id !== id) return addon;
           const updated = { ...addon, ...updates };
-          updated.total = updated.unit === "flat" ? updated.price : updated.price * updated.quantity;
+          updated.total =
+            updated.unit === "flat"
+              ? updated.price
+              : updated.price * updated.quantity;
           return updated;
         })
       );
@@ -172,6 +183,11 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
 
   const removeCustomAddon = useCallback((id: string) => {
     setCustomAddons((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  // Direct hours setter
+  const setDirectHours = useCallback((hours: number) => {
+    setDirectHoursState(hours);
   }, []);
 
   // Reset all state
@@ -185,6 +201,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     setTotalSqft(0);
     setWallSqft(0);
     setCeilingSqft(0);
+    setDirectHoursState(0);
   }, []);
 
   // Calculate totals
@@ -200,17 +217,24 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
       rates: defaultRates,
     });
 
-    // Add custom addons to totals
+    // Add custom addons and direct hours to totals
     const customAddonsTotal = customAddons.reduce((sum, a) => sum + a.total, 0);
-    if (customAddonsTotal > 0) {
+    const hoursLabor = directHours * hourlyRate;
+    const extraTotal = customAddonsTotal + hoursLabor;
+
+    if (extraTotal > 0) {
       const newAddonsSubtotal = baseTotals.addonsSubtotal + customAddonsTotal;
-      const newSubtotal = baseTotals.subtotal + customAddonsTotal;
-      const newComplexityAdjustment = newSubtotal * (baseTotals.complexityMultiplier - 1);
+      const newLaborSubtotal = baseTotals.laborSubtotal + hoursLabor;
+      const newSubtotal = baseTotals.subtotal + extraTotal;
+      const newComplexityAdjustment =
+        newSubtotal * (baseTotals.complexityMultiplier - 1);
       const newTotal = newSubtotal + newComplexityAdjustment;
-      const newCostPerSqft = baseTotals.totalSqft > 0 ? newTotal / baseTotals.totalSqft : 0;
+      const newCostPerSqft =
+        baseTotals.totalSqft > 0 ? newTotal / baseTotals.totalSqft : 0;
 
       return {
         ...baseTotals,
+        laborSubtotal: newLaborSubtotal,
         addonsSubtotal: newAddonsSubtotal,
         subtotal: newSubtotal,
         complexityAdjustment: newComplexityAdjustment,
@@ -231,6 +255,8 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     complexity,
     addons,
     customAddons,
+    directHours,
+    hourlyRate,
     defaultRates,
   ]);
 
@@ -245,6 +271,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     totalSqft,
     wallSqft,
     ceilingSqft,
+    directHours,
     totals,
     defaultRates,
     defaultAddonPrices,
@@ -254,6 +281,7 @@ export function usePaintingEstimate(): UsePaintingEstimateReturn {
     setPaintQuality,
     setSurfacePrep,
     setComplexity,
+    setDirectHours,
     toggleAddon,
     updateAddonQuantity,
     removeAddon,

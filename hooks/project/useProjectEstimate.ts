@@ -157,33 +157,44 @@ export function useProjectEstimate(
   );
 
   // Sync square footage to trade hooks when rooms change
-  // Hanging uses gross sqft (no deductions), finishing/painting use net sqft
+  // Uses trade-specific room views to respect wall/ceiling overrides per trade
   const syncSqftToTrades = useCallback(() => {
-    // Get sqft from roomsHook (respects input mode - rooms vs manual)
-    const grossSqft = roomsHook.totalGrossSqft; // For hanging (no openings deducted)
-    const totalSqft = roomsHook.totalSqft; // For finishing (with openings deducted)
-    const wallSqft = roomsHook.totalWallSqft;
-    const ceilingSqft = roomsHook.totalCeilingSqft;
+    const hasRooms = roomsHook.inputMode === "rooms" && roomsHook.rooms.length > 0;
 
-    // Sync to hanging estimate - uses gross sqft (industry standard)
+    // Sync to hanging estimate - uses gross sqft (no openings deducted)
+    // Uses setFromRooms to track wall/ceiling breakdown for ceiling height multiplier
     if (enabledTrades.includes("drywall_hanging")) {
-      hangingEstimate.setSqft(grossSqft);
+      if (hasRooms) {
+        const hangingViews = getTradeRoomViews("drywall_hanging");
+        hangingEstimate.setFromRooms(hangingViews);
+      } else {
+        hangingEstimate.setSqft(roomsHook.totalGrossSqft);
+      }
     }
 
     // Sync to finishing estimate - uses net sqft (openings deducted)
     if (enabledTrades.includes("drywall_finishing")) {
-      finishingEstimate.setSqft(totalSqft);
+      if (hasRooms) {
+        const finishingViews = getTradeRoomViews("drywall_finishing");
+        // Sum effective net sqft (respects wall/ceiling toggles, with opening deductions)
+        const netSqft = finishingViews.reduce(
+          (sum, r) => sum + r.effectiveTotalSqft,
+          0
+        );
+        finishingEstimate.setSqft(netSqft);
+      } else {
+        finishingEstimate.setSqft(roomsHook.totalSqft);
+      }
     }
 
-    // Sync to painting estimate - uses net sqft (openings deducted)
+    // Sync to painting estimate - uses net sqft with wall/ceiling breakdown
     if (enabledTrades.includes("painting")) {
-      if (roomsHook.inputMode === "rooms" && roomsHook.rooms.length > 0) {
+      if (hasRooms) {
         const paintingViews = getTradeRoomViews("painting");
         paintingEstimate.setFromRooms(paintingViews);
       } else {
-        // Manual mode - set sqft directly
-        paintingEstimate.setWallSqft(wallSqft);
-        paintingEstimate.setCeilingSqft(ceilingSqft);
+        paintingEstimate.setWallSqft(roomsHook.totalWallSqft);
+        paintingEstimate.setCeilingSqft(roomsHook.totalCeilingSqft);
       }
     }
   }, [

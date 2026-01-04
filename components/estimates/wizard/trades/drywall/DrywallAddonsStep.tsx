@@ -53,7 +53,7 @@ export function DrywallAddonsStep({
   useEffect(() => {
     setFooterConfig({
       onContinue: handleContinue,
-      continueText: addons.length === 0 ? "Skip" : "Continue",
+      continueText: "Continue",
     });
     return () => setFooterConfig(null);
   }, [setFooterConfig, handleContinue, addons.length]);

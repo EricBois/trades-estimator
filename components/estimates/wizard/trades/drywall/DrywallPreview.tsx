@@ -14,13 +14,20 @@ import {
 } from "@/lib/trades/drywallFinishing/constants";
 import { WIZARD_COMPLEXITY_LEVELS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/estimateCalculations";
-import { cn } from "@/lib/utils";
 
 export function DrywallPreview() {
   const { nextStep, goToStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
-  const { finishLevel, lineItems, addons, materials, complexity, totals } =
-    useDrywallEstimate();
+  const {
+    finishLevel,
+    lineItems,
+    addons,
+    materials,
+    complexity,
+    totals,
+    directHours,
+    hourlyRate,
+  } = useDrywallEstimate();
 
   // Configure footer with "Send to Homeowner" button
   const handleContinue = useCallback(() => nextStep(), [nextStep]);
@@ -230,6 +237,31 @@ export function DrywallPreview() {
         </div>
       )}
 
+      {/* Additional Hours */}
+      {directHours > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 mb-4">
+          <div className="flex items-center justify-between p-4 border-b border-gray-100">
+            <p className="font-medium text-gray-900">Additional Hours</p>
+            <button
+              onClick={() => goToStep(2)} // Addons is step 2
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="px-4 py-3 flex justify-between items-center">
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                {directHours} hours @ ${hourlyRate}/hr
+              </p>
+            </div>
+            <p className="font-medium text-gray-900">
+              +${formatCurrency(directHours * hourlyRate)}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Complexity */}
       <div className="bg-white rounded-xl border border-gray-200 mb-4">
         <div className="flex items-center justify-between p-4">
@@ -274,6 +306,14 @@ export function DrywallPreview() {
               <span className="text-gray-500">Materials</span>
               <span className="text-gray-900">
                 +${formatCurrency(totals.materialsSubtotal)}
+              </span>
+            </div>
+          )}
+          {directHours > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Additional Hours</span>
+              <span className="text-gray-900">
+                +${formatCurrency(directHours * hourlyRate)}
               </span>
             </div>
           )}

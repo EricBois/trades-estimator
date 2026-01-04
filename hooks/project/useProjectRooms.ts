@@ -404,24 +404,35 @@ export function useProjectRooms(projectId: string) {
     [recalculateRoom]
   );
 
-  // Save rooms to database
+  // Save rooms to database (with optional target project ID override)
   const saveRoomsMutation = useMutation({
-    mutationFn: async () => {
-      // Delete existing rooms for this project
-      await supabase.from("project_rooms").delete().eq("project_id", projectId);
+    mutationFn: async (targetProjectId?: string) => {
+      const saveToProjectId = targetProjectId ?? projectId;
 
-      // Insert new rooms
+      // Delete existing rooms for this project
+      await supabase
+        .from("project_rooms")
+        .delete()
+        .eq("project_id", saveToProjectId);
+
+      // Insert new rooms with the target project ID
       if (rooms.length > 0) {
-        const inserts = rooms.map(toDbInsert);
+        const inserts = rooms.map((room) => ({
+          ...toDbInsert(room),
+          project_id: saveToProjectId,
+        }));
         const { error } = await supabase.from("project_rooms").insert(inserts);
         if (error) throw error;
       }
 
       return rooms;
     },
-    onSuccess: () => {
+    onSuccess: (_, targetProjectId) => {
       setIsDirty(false);
-      queryClient.invalidateQueries({ queryKey: ["project-rooms", projectId] });
+      const savedProjectId = targetProjectId ?? projectId;
+      queryClient.invalidateQueries({
+        queryKey: ["project-rooms", savedProjectId],
+      });
     },
   });
 

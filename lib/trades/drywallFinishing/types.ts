@@ -101,6 +101,7 @@ export interface DrywallEstimateData {
   customAddons: CustomAddon[];
   materials: FinishingMaterialEntry[]; // Manual material entries
   complexity: DrywallComplexity;
+  directHours: number; // For labor-only mode - direct hours entry
 }
 
 // Calculated totals
@@ -130,6 +131,7 @@ export interface DrywallEstimate extends DrywallEstimateData {
 // Actions for the hook
 export interface DrywallEstimateActions {
   setFinishLevel: (level: DrywallFinishLevel) => void;
+  setDirectHours: (hours: number) => void;
   addLineItem: (type: DrywallLineItemType) => void;
   updateLineItem: (
     id: string,
@@ -141,10 +143,21 @@ export interface DrywallEstimateActions {
   toggleAddon: (addonId: DrywallAddonId, quantity?: number) => void;
   removeAddon: (addonId: DrywallAddonId) => void;
   updateAddonQuantity: (addonId: DrywallAddonId, quantity: number) => void;
-  setAddonPriceOverride: (addonId: DrywallAddonId, override: number | undefined) => void;
+  setAddonPriceOverride: (
+    addonId: DrywallAddonId,
+    override: number | undefined
+  ) => void;
   // Custom addon management
-  addCustomAddon: (name: string, price: number, unit: AddonUnit, quantity?: number) => void;
-  updateCustomAddon: (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => void;
+  addCustomAddon: (
+    name: string,
+    price: number,
+    unit: AddonUnit,
+    quantity?: number
+  ) => void;
+  updateCustomAddon: (
+    id: string,
+    updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>
+  ) => void;
   removeCustomAddon: (id: string) => void;
   setComplexity: (complexity: DrywallComplexity) => void;
   // Set sqft directly (for project wizard integration)

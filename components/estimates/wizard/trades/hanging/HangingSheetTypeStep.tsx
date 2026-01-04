@@ -74,6 +74,7 @@ export function HangingSheetTypeStep({
     clientSuppliesMaterials,
     setClientSuppliesMaterials,
     setSheetLaborCostOverride,
+    directHours,
   } = estimate;
 
   // State for labor edit sheet
@@ -87,29 +88,8 @@ export function HangingSheetTypeStep({
 
   // Track if we've done initial sheet calculation
   const hasInitialized = useRef(false);
-
-  // Calculate sheets from rooms only on first load (not when user deletes sheets)
-  useEffect(() => {
-    if (!hasInitialized.current && sheets.length === 0 && rooms.length > 0) {
-      calculateSheetsFromRooms();
-      hasInitialized.current = true;
-    }
-  }, [sheets.length, rooms.length, calculateSheetsFromRooms]);
-
-  // Allow continuing if we have sqft (from rooms OR sheets via project wizard)
-  const hasSelection = totals.grossTotalSqft > 0;
-
-  // Configure footer
-  const handleContinue = useCallback(() => nextStep(), [nextStep]);
-
-  useEffect(() => {
-    setFooterConfig({
-      onContinue: handleContinue,
-      continueText: "Continue",
-      disabled: !hasSelection,
-    });
-    return () => setFooterConfig(null);
-  }, [setFooterConfig, handleContinue, hasSelection]);
+  // Track previous waste factor to detect changes
+  const prevWasteFactorRef = useRef(wasteFactor);
 
   // Use gross sqft for hanging (no deductions for openings - industry standard)
   // Use totals from hook which handles all input modes correctly
@@ -122,6 +102,59 @@ export function HangingSheetTypeStep({
   );
   const allocatedSheets = sheets.reduce((sum, s) => sum + s.quantity, 0);
   const remainingSheets = totalSheetsNeeded - allocatedSheets;
+
+  // Calculate sheets from rooms only on first load (not when user deletes sheets)
+  useEffect(() => {
+    if (!hasInitialized.current && sheets.length === 0 && rooms.length > 0) {
+      calculateSheetsFromRooms();
+      hasInitialized.current = true;
+    }
+  }, [sheets.length, rooms.length, calculateSheetsFromRooms]);
+
+  // Recalculate sheet quantities when waste factor changes
+  useEffect(() => {
+    // Only run if waste factor actually changed (not on initial render)
+    if (prevWasteFactorRef.current === wasteFactor) return;
+    prevWasteFactorRef.current = wasteFactor;
+
+    if (sheets.length === 0 || totalSqft <= 0) return;
+
+    const newTotalNeeded = Math.ceil(
+      (totalSqft * (1 + wasteFactor)) / sqftPerSheet
+    );
+
+    if (sheets.length === 1) {
+      // Single sheet type - update to new total
+      updateSheet(sheets[0].id, { quantity: newTotalNeeded });
+    } else {
+      // Multiple sheet types - scale proportionally
+      const currentTotal = sheets.reduce((sum, s) => sum + s.quantity, 0);
+      if (currentTotal > 0) {
+        const scale = newTotalNeeded / currentTotal;
+        sheets.forEach((sheet) => {
+          const newQty = Math.round(sheet.quantity * scale);
+          updateSheet(sheet.id, { quantity: Math.max(0, newQty) });
+        });
+      }
+    }
+  }, [wasteFactor, totalSqft, sqftPerSheet, sheets, updateSheet]);
+
+  // Sheet selection is optional - sqft comes from rooms/project, user can add hours later
+  // Allow continuing always - this step is for material selection which is optional
+  const hasContent =
+    totals.grossTotalSqft > 0 || directHours > 0 || sheets.length > 0;
+
+  // Configure footer
+  const handleContinue = useCallback(() => nextStep(), [nextStep]);
+
+  useEffect(() => {
+    setFooterConfig({
+      onContinue: handleContinue,
+      continueText: "Continue",
+      disabled: false, // Always allow continue - step is optional for hours-only estimates
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, handleContinue]);
 
   const handleTypeToggle = (typeId: DrywallSheetTypeId) => {
     const existingSheet = sheets.find((s) => s.typeId === typeId);
@@ -339,7 +372,7 @@ export function HangingSheetTypeStep({
       </div>
 
       {/* Cost Summary */}
-      {hasSelection && (
+      {hasContent && (
         <CostSummary
           variant={clientSuppliesMaterials ? "orange" : "blue"}
           className="mb-6"

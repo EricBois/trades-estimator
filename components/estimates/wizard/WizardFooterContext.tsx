@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 
@@ -16,11 +17,22 @@ interface WizardFooterConfig {
   loadingText?: string;
   icon?: "arrow" | "send";
   summaryContent?: ReactNode;
+  onSaveDraft?: () => void;
+  isSavingDraft?: boolean;
 }
 
 interface WizardFooterContextValue {
   config: WizardFooterConfig | null;
   setFooterConfig: (config: WizardFooterConfig | null) => void;
+  // Step tracking for navigation direction detection
+  lastVisitedStep: number | null;
+  setLastVisitedStep: (step: number) => void;
+  // Global save draft handler (set by wizard wrapper)
+  hasSaveDraft: boolean;
+  getGlobalSaveDraft: () => (() => Promise<void>) | null;
+  setGlobalSaveDraft: (handler: (() => Promise<void>) | null) => void;
+  isSavingDraft: boolean;
+  setIsSavingDraft: (saving: boolean) => void;
 }
 
 const WizardFooterContext = createContext<WizardFooterContextValue | null>(
@@ -29,6 +41,14 @@ const WizardFooterContext = createContext<WizardFooterContextValue | null>(
 
 export function WizardFooterProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<WizardFooterConfig | null>(null);
+  const [lastVisitedStep, setLastVisitedStepState] = useState<number | null>(
+    null
+  );
+  // Use ref for save draft handler to avoid re-render loops
+  const globalSaveDraftRef = useRef<(() => Promise<void>) | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  // Track if save draft is available (for UI rendering)
+  const [hasSaveDraft, setHasSaveDraft] = useState(false);
 
   const setFooterConfig = useCallback(
     (newConfig: WizardFooterConfig | null) => {
@@ -37,8 +57,35 @@ export function WizardFooterProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const setLastVisitedStep = useCallback((step: number) => {
+    setLastVisitedStepState(step);
+  }, []);
+
+  const setGlobalSaveDraft = useCallback(
+    (handler: (() => Promise<void>) | null) => {
+      globalSaveDraftRef.current = handler;
+      setHasSaveDraft(handler !== null);
+    },
+    []
+  );
+
+  // Getter function to access the ref's current value
+  const getGlobalSaveDraft = useCallback(() => globalSaveDraftRef.current, []);
+
   return (
-    <WizardFooterContext.Provider value={{ config, setFooterConfig }}>
+    <WizardFooterContext.Provider
+      value={{
+        config,
+        setFooterConfig,
+        lastVisitedStep,
+        setLastVisitedStep,
+        hasSaveDraft,
+        getGlobalSaveDraft,
+        setGlobalSaveDraft,
+        isSavingDraft,
+        setIsSavingDraft,
+      }}
+    >
       {children}
     </WizardFooterContext.Provider>
   );

@@ -119,7 +119,7 @@ export function DrywallMaterialsStep({
   useEffect(() => {
     setFooterConfig({
       onContinue: handleContinue,
-      continueText: materials.length === 0 ? "Skip" : "Continue",
+      continueText: "Continue",
     });
     return () => setFooterConfig(null);
   }, [setFooterConfig, handleContinue, materials.length]);

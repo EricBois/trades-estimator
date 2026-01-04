@@ -1,16 +1,40 @@
 "use client";
 
 import { useWizard } from "react-use-wizard";
-import { ArrowLeft, Home, ChevronRight, Send, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Home,
+  ChevronRight,
+  Send,
+  Loader2,
+  Save,
+} from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useWizardFooter } from "./WizardFooterContext";
 
 export function WizardNavigation() {
   const { previousStep, isFirstStep } = useWizard();
-  const { config } = useWizardFooter();
+  const {
+    config,
+    hasSaveDraft,
+    getGlobalSaveDraft,
+    isSavingDraft,
+    setIsSavingDraft,
+  } = useWizardFooter();
 
   const Icon = config?.icon === "send" ? Send : ChevronRight;
+
+  const handleSaveDraft = async () => {
+    const saveDraft = getGlobalSaveDraft();
+    if (!saveDraft || isSavingDraft) return;
+    setIsSavingDraft(true);
+    try {
+      await saveDraft();
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 pb-safe z-40">
@@ -48,33 +72,64 @@ export function WizardNavigation() {
             </button>
           )}
 
-          {/* Continue button on far right */}
-          {config && (
-            <button
-              onClick={config.onContinue}
-              disabled={config.disabled || config.isLoading}
-              className={cn(
-                "inline-flex items-center justify-center gap-2",
-                "px-6 py-3",
-                "bg-blue-600 text-white rounded-xl",
-                "hover:bg-blue-700 active:scale-[0.98]",
-                "transition-all font-medium text-base",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-            >
-              {config.isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  {config.loadingText || "Loading..."}
-                </>
-              ) : (
-                <>
-                  {config.continueText || "Continue"}
-                  <Icon className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          )}
+          {/* Right side buttons */}
+          <div className="flex items-center gap-2">
+            {/* Save Draft button (if global handler available) */}
+            {hasSaveDraft && (
+              <button
+                onClick={handleSaveDraft}
+                disabled={isSavingDraft}
+                className={cn(
+                  "inline-flex items-center justify-center gap-2",
+                  "px-4 py-3",
+                  "border-2 border-gray-200 text-gray-700 rounded-xl",
+                  "hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98]",
+                  "transition-all font-medium text-sm",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
+              >
+                {isSavingDraft ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="hidden sm:inline">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span className="hidden sm:inline">Save Draft</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Continue button */}
+            {config && (
+              <button
+                onClick={config.onContinue}
+                disabled={config.disabled || config.isLoading}
+                className={cn(
+                  "inline-flex items-center justify-center gap-2",
+                  "px-6 py-3",
+                  "bg-blue-600 text-white rounded-xl",
+                  "hover:bg-blue-700 active:scale-[0.98]",
+                  "transition-all font-medium text-base",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
+              >
+                {config.isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    {config.loadingText || "Loading..."}
+                  </>
+                ) : (
+                  <>
+                    {config.continueText || "Continue"}
+                    <Icon className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

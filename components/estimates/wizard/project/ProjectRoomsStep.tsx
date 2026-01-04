@@ -246,7 +246,8 @@ function RoomCard({
 export function ProjectRoomsStep() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
-  const { roomsHook } = useProjectEstimateContext();
+  const { roomsHook, hangingEstimate, finishingEstimate, paintingEstimate } =
+    useProjectEstimateContext();
   const {
     rooms,
     totalSqft,
@@ -266,7 +267,28 @@ export function ProjectRoomsStep() {
     manualCeilingSqft,
     setManualWallSqft,
     setManualCeilingSqft,
+    reset: resetRooms,
   } = roomsHook;
+
+  // Handle mode change - clear all data when switching to avoid confusing UI
+  const handleModeChange = (newMode: "rooms" | "manual") => {
+    if (newMode !== inputMode) {
+      // Clear room/sqft data based on what mode we're leaving
+      if (inputMode === "rooms") {
+        resetRooms(); // Clear rooms
+      } else if (inputMode === "manual") {
+        setManualWallSqft(0);
+        setManualCeilingSqft(0);
+      }
+
+      // Reset all trade estimates to clear costs
+      hangingEstimate.reset();
+      finishingEstimate.reset();
+      paintingEstimate.reset();
+
+      setInputMode(newMode);
+    }
+  };
 
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(
     rooms[0]?.id ?? null
@@ -286,7 +308,7 @@ export function ProjectRoomsStep() {
     setOpeningSheet({ isOpen: true, roomId, type });
   };
 
-  // Can continue if we have sqft either way
+  // Can continue if we have sqft (rooms or manual)
   const canContinue =
     inputMode === "rooms"
       ? rooms.length > 0 && totalSqft > 0
@@ -316,35 +338,33 @@ export function ProjectRoomsStep() {
           {/* Input Mode Toggle */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              How would you like to enter square footage?
+              How would you like to estimate this project?
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => setInputMode("rooms")}
+                onClick={() => handleModeChange("rooms")}
                 className={cn(
-                  "p-4 rounded-xl border-2 text-center transition-all",
+                  "p-3 rounded-xl border-2 text-center transition-all",
                   inputMode === "rooms"
                     ? "border-blue-500 bg-blue-50"
                     : "border-gray-200 hover:border-gray-300"
                 )}
               >
-                <LayoutGrid className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-                <div className="font-medium text-gray-900">Add Rooms</div>
-                <div className="text-xs text-gray-500">
-                  Enter room dimensions
-                </div>
+                <LayoutGrid className="w-5 h-5 mx-auto mb-1 text-gray-600" />
+                <div className="font-medium text-gray-900 text-sm">Rooms</div>
+                <div className="text-xs text-gray-500">Enter dimensions</div>
               </button>
               <button
-                onClick={() => setInputMode("manual")}
+                onClick={() => handleModeChange("manual")}
                 className={cn(
-                  "p-4 rounded-xl border-2 text-center transition-all",
+                  "p-3 rounded-xl border-2 text-center transition-all",
                   inputMode === "manual"
                     ? "border-blue-500 bg-blue-50"
                     : "border-gray-200 hover:border-gray-300"
                 )}
               >
                 <svg
-                  className="w-6 h-6 mx-auto mb-2 text-gray-600"
+                  className="w-5 h-5 mx-auto mb-1 text-gray-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -356,10 +376,8 @@ export function ProjectRoomsStep() {
                     d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                   />
                 </svg>
-                <div className="font-medium text-gray-900">Enter Sqft</div>
-                <div className="text-xs text-gray-500">
-                  Enter total sqft directly
-                </div>
+                <div className="font-medium text-gray-900 text-sm">Sqft</div>
+                <div className="text-xs text-gray-500">Enter directly</div>
               </button>
             </div>
           </div>

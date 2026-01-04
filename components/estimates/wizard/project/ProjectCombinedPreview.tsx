@@ -36,11 +36,15 @@ function TradeBreakdown({
   isExpanded,
   onToggle,
   totalSqft,
+  directHours,
+  hourlyRate,
 }: {
   tradeType: ProjectTradeType;
   isExpanded: boolean;
   onToggle: () => void;
   totalSqft: number;
+  directHours: number;
+  hourlyRate: number;
 }) {
   const { tradeTotals } = useProjectEstimateContext();
   const totals = tradeTotals[tradeType];
@@ -63,6 +67,7 @@ function TradeBreakdown({
             <div className="font-medium text-gray-900">{displayInfo.label}</div>
             <div className="text-sm text-gray-500">
               {totalSqft.toFixed(0)} sqft
+              {directHours > 0 && ` + ${directHours} hrs`}
             </div>
           </div>
         </div>
@@ -96,6 +101,14 @@ function TradeBreakdown({
               {formatCurrency(totals.laborSubtotal)}
             </span>
           </div>
+          {directHours > 0 && (
+            <div className="flex justify-between text-sm text-gray-500 pl-4">
+              <span>
+                ({directHours} hrs × ${hourlyRate}/hr)
+              </span>
+              <span>{formatCurrency(directHours * hourlyRate)}</span>
+            </div>
+          )}
           {totals.addonsSubtotal > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Add-ons</span>
@@ -138,8 +151,36 @@ function TradeBreakdown({
 export function ProjectCombinedPreview() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
-  const { enabledTrades, projectTotals, roomsHook } =
-    useProjectEstimateContext();
+  const {
+    enabledTrades,
+    projectTotals,
+    roomsHook,
+    getTradeRoomViews,
+    hangingEstimate,
+    finishingEstimate,
+    paintingEstimate,
+  } = useProjectEstimateContext();
+
+  // Get hours and hourly rate for each trade
+  const getTradeHours = (tradeType: ProjectTradeType) => {
+    switch (tradeType) {
+      case "drywall_hanging":
+        return {
+          directHours: hangingEstimate.directHours,
+          hourlyRate: hangingEstimate.hourlyRate,
+        };
+      case "drywall_finishing":
+        return {
+          directHours: finishingEstimate.directHours,
+          hourlyRate: finishingEstimate.hourlyRate,
+        };
+      case "painting":
+        return {
+          directHours: paintingEstimate.directHours,
+          hourlyRate: paintingEstimate.hourlyRate,
+        };
+    }
+  };
 
   const [expandedTrade, setExpandedTrade] = useState<ProjectTradeType | null>(
     null
@@ -201,19 +242,39 @@ export function ProjectCombinedPreview() {
             <div className="text-sm font-medium text-gray-700">
               Trade Breakdown
             </div>
-            {enabledTrades.map((tradeType) => (
-              <TradeBreakdown
-                key={tradeType}
-                tradeType={tradeType}
-                isExpanded={expandedTrade === tradeType}
-                onToggle={() =>
-                  setExpandedTrade(
-                    expandedTrade === tradeType ? null : tradeType
-                  )
-                }
-                totalSqft={roomsHook.totalSqft}
-              />
-            ))}
+            {enabledTrades.map((tradeType) => {
+              // Calculate trade-specific sqft based on room overrides
+              const tradeViews = getTradeRoomViews(tradeType);
+              const tradeSqft =
+                roomsHook.inputMode === "rooms" && tradeViews.length > 0
+                  ? tradeViews.reduce(
+                      (sum, r) =>
+                        sum +
+                        (tradeType === "drywall_hanging"
+                          ? r.effectiveGrossTotalSqft
+                          : r.effectiveTotalSqft),
+                      0
+                    )
+                  : roomsHook.totalSqft;
+
+              const { directHours, hourlyRate } = getTradeHours(tradeType);
+
+              return (
+                <TradeBreakdown
+                  key={tradeType}
+                  tradeType={tradeType}
+                  isExpanded={expandedTrade === tradeType}
+                  onToggle={() =>
+                    setExpandedTrade(
+                      expandedTrade === tradeType ? null : tradeType
+                    )
+                  }
+                  totalSqft={tradeSqft}
+                  directHours={directHours}
+                  hourlyRate={hourlyRate}
+                />
+              );
+            })}
           </div>
 
           {/* Combined total */}

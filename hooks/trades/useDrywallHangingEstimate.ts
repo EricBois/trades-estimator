@@ -46,6 +46,7 @@ import {
   RoomShape,
 } from "@/lib/trades/drywallHanging/types";
 import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
+import { TradeRoomView } from "@/lib/project/types";
 
 // Generate unique ID
 function generateId(): string {
@@ -105,6 +106,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
   const [clientSuppliesMaterials, setClientSuppliesMaterialsState] =
     useState<boolean>(false);
   const [directSqft, setDirectSqftState] = useState<number>(0);
+  const [directHours, setDirectHoursState] = useState<number>(0);
   const [rooms, setRooms] = useState<HangingRoom[]>([]);
   const [sheets, setSheets] = useState<HangingSheetEntry[]>([]);
   const [ceilingFactor, setCeilingFactor] =
@@ -113,6 +115,9 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
   const [complexity, setComplexity] = useState<HangingComplexity>("standard");
   const [addons, setAddons] = useState<HangingSelectedAddon[]>([]);
   const [customAddons, setCustomAddons] = useState<CustomAddon[]>([]);
+  // For project wizard: track wall/ceiling sqft separately when set via setFromRooms
+  const [projectGrossWallSqft, setProjectGrossWallSqft] = useState<number>(0);
+  const [projectCeilingSqft, setProjectCeilingSqft] = useState<number>(0);
 
   // Get hourly rate from profile
   const hourlyRate = profile?.hourly_rate ?? 75;
@@ -570,6 +575,72 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     [wasteFactor, customRates, clientSuppliesMaterials]
   );
 
+  // Set sqft from project wizard trade room views (tracks wall/ceiling separately)
+  const setFromRooms = useCallback(
+    (tradeRooms: TradeRoomView[]) => {
+      // Calculate wall and ceiling sqft separately (using gross for hanging)
+      const grossWallSqft = tradeRooms.reduce(
+        (sum, r) => sum + r.effectiveGrossWallSqft,
+        0
+      );
+      const ceilingSqft = tradeRooms.reduce(
+        (sum, r) => sum + r.effectiveCeilingSqft,
+        0
+      );
+      const totalGrossSqft = grossWallSqft + ceilingSqft;
+
+      // Store wall/ceiling breakdown for ceiling multiplier calculations
+      setProjectGrossWallSqft(grossWallSqft);
+      setProjectCeilingSqft(ceilingSqft);
+
+      // Update sheets based on total sqft
+      if (totalGrossSqft <= 0) {
+        return;
+      }
+
+      setSheets((prevSheets) => {
+        const currentSheet = prevSheets[0];
+        const typeId: DrywallSheetTypeId =
+          currentSheet?.typeId ?? "standard_half";
+        const size: DrywallSheetSize = currentSheet?.size ?? "4x8";
+        const sheetId = currentSheet?.id ?? generateId();
+
+        const sizeInfo = getSheetSize(size);
+        if (!sizeInfo) return prevSheets;
+
+        const sheetsNeeded = calculateSheetsNeeded(
+          totalGrossSqft,
+          size,
+          wasteFactor
+        );
+
+        const materialCost = getSheetMaterialCost(typeId, customRates);
+        const laborCost = getSheetLaborCost(typeId, customRates, size);
+        const includeMaterial =
+          currentSheet?.includeMaterial ?? !clientSuppliesMaterials;
+        const totalPerSheet = (includeMaterial ? materialCost : 0) + laborCost;
+
+        return [
+          {
+            id: sheetId,
+            typeId,
+            size,
+            quantity: sheetsNeeded,
+            materialCost,
+            laborCost,
+            totalPerSheet,
+            subtotal: totalPerSheet * sheetsNeeded,
+            includeMaterial,
+            materialCostOverride: currentSheet?.materialCostOverride,
+            laborCostOverride: currentSheet?.laborCostOverride,
+            hasOverride: currentSheet?.hasOverride ?? false,
+          },
+        ];
+      });
+    },
+    [wasteFactor, customRates, clientSuppliesMaterials]
+  );
+
   // Addon management
   const toggleAddon = useCallback(
     (addonId: HangingAddonId, quantity: number = 1) => {
@@ -799,12 +870,18 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     setDirectSqftState(sqft);
   }, []);
 
+  // Direct hours setter for labor_only mode
+  const setDirectHours = useCallback((hours: number) => {
+    setDirectHoursState(hours);
+  }, []);
+
   // Reset all state
   const reset = useCallback(() => {
     setInputModeState("calculator");
     setPricingMethod("per_sheet");
     setClientSuppliesMaterialsState(false);
     setDirectSqftState(0);
+    setDirectHoursState(0);
     setRooms([]);
     setSheets([]);
     setCeilingFactor("standard");
@@ -823,14 +900,16 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     if (inputMode === "labor_only" && pricingMethod === "per_sqft") {
       const totalSqft = directSqft;
 
-      // Labor only calculation - no materials, just sqft * rate
+      // Labor only calculation - no materials, just sqft * rate + hours * hourly rate
       // Use custom ceiling height multiplier from settings
       const ceilingMultiplier = getUserCeilingHeightMultiplier(
         ceilingFactor,
         customRates
       );
       // In labor_only mode, we don't have wall/ceiling breakdown, so apply to all
-      const laborSubtotal = totalSqft * laborPerSqft * ceilingMultiplier;
+      const sqftLabor = totalSqft * laborPerSqft * ceilingMultiplier;
+      const hoursLabor = directHours * hourlyRate;
+      const laborSubtotal = sqftLabor + hoursLabor;
 
       // No material cost in labor_only mode
       const materialSubtotal = 0;
@@ -929,15 +1008,23 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     }
 
     // Get wall and ceiling sqft separately for "applies to" logic
-    const grossWallSqft =
-      inputMode === "calculator" && rooms.length > 0
-        ? roomTotals.totalGrossWallSqft
-        : grossTotalSqft; // Can't separate walls/ceiling from sheets
+    // Priority: 1) rooms if in calculator mode, 2) project sqft if set via setFromRooms, 3) fallback
+    let grossWallSqft: number;
+    let ceilingSqft: number;
 
-    const ceilingSqft =
-      inputMode === "calculator" && rooms.length > 0
-        ? roomTotals.totalCeilingSqft
-        : 0; // Can't separate from sheets
+    if (inputMode === "calculator" && rooms.length > 0) {
+      // Use room totals from standalone wizard
+      grossWallSqft = roomTotals.totalGrossWallSqft;
+      ceilingSqft = roomTotals.totalCeilingSqft;
+    } else if (projectGrossWallSqft > 0 || projectCeilingSqft > 0) {
+      // Use project wizard values (set via setFromRooms)
+      grossWallSqft = projectGrossWallSqft;
+      ceilingSqft = projectCeilingSqft;
+    } else {
+      // Fallback: treat all sqft as walls (can't separate from sheets alone)
+      grossWallSqft = grossTotalSqft;
+      ceilingSqft = 0;
+    }
 
     // Labor calculation based on what the ceiling multiplier applies to
     let laborSubtotal: number;
@@ -957,6 +1044,9 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       const ceilingLabor = ceilingSqft * baseRate;
       laborSubtotal = wallLabor + ceilingLabor;
     }
+
+    // Add extra hours labor (from TradeHoursStep)
+    laborSubtotal += directHours * hourlyRate;
 
     // Addons subtotal (including custom addons)
     const predefinedAddonsTotal = addons.reduce((sum, a) => sum + a.total, 0);
@@ -995,6 +1085,8 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     inputMode,
     pricingMethod,
     directSqft,
+    directHours,
+    hourlyRate,
     rooms,
     sheets,
     ceilingFactor,
@@ -1002,6 +1094,8 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     addons,
     customAddons,
     customRates,
+    projectGrossWallSqft,
+    projectCeilingSqft,
   ]);
 
   return {
@@ -1010,6 +1104,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     pricingMethod,
     clientSuppliesMaterials,
     directSqft,
+    directHours,
     rooms,
     sheets,
     ceilingFactor,
@@ -1026,6 +1121,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     setPricingMethod,
     setClientSuppliesMaterials,
     setDirectSqft,
+    setDirectHours,
     addRoom,
     updateRoom,
     removeRoom,
@@ -1041,6 +1137,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     removeSheet,
     calculateSheetsFromRooms,
     setSqft,
+    setFromRooms,
     setCeilingFactor,
     setWasteFactor,
     setComplexity,

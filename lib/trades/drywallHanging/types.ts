@@ -9,6 +9,7 @@ import {
   DrywallHangingAddonPrices,
 } from "@/hooks/useProfile";
 import { CustomAddon, AddonUnit } from "@/lib/trades/shared/types";
+import { TradeRoomView } from "@/lib/project/types";
 
 // Input mode
 export type HangingInputMode = "calculator" | "direct" | "labor_only";
@@ -134,6 +135,7 @@ export interface DrywallHangingEstimateData {
   pricingMethod: HangingPricingMethod;
   clientSuppliesMaterials: boolean; // When true, all sheets labor-only
   directSqft: number; // For labor_only mode - direct sqft entry
+  directHours: number; // For labor_only mode - direct hours entry
   rooms: HangingRoom[];
   sheets: HangingSheetEntry[];
   ceilingFactor: CeilingHeightFactor;
@@ -167,6 +169,7 @@ export interface DrywallHangingEstimateActions {
   setPricingMethod: (method: HangingPricingMethod) => void;
   setClientSuppliesMaterials: (value: boolean) => void;
   setDirectSqft: (sqft: number) => void;
+  setDirectHours: (hours: number) => void;
   // Room management (calculator mode)
   addRoom: (name?: string) => string;
   updateRoom: (
@@ -224,6 +227,8 @@ export interface DrywallHangingEstimateActions {
   calculateSheetsFromRooms: () => void;
   // Set sqft directly (for project wizard integration)
   setSqft: (totalSqft: number) => void;
+  // Set sqft from project wizard trade room views (tracks wall/ceiling separately)
+  setFromRooms: (rooms: TradeRoomView[]) => void;
   // Settings
   setCeilingFactor: (factor: CeilingHeightFactor) => void;
   setWasteFactor: (factor: number) => void;

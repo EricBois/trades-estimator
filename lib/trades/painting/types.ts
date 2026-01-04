@@ -46,6 +46,8 @@ export interface PaintingEstimateData {
   totalSqft: number;
   ceilingSqft: number;
   wallSqft: number;
+  // Direct hours entry
+  directHours: number;
 }
 
 // Totals breakdown
@@ -79,14 +81,26 @@ export interface PaintingEstimateActions {
   setPaintQuality: (quality: PaintingQuality) => void;
   setSurfacePrep: (prep: PaintingSurfacePrep) => void;
   setComplexity: (complexity: PaintingComplexity) => void;
+  setDirectHours: (hours: number) => void;
   // Addon management
   toggleAddon: (addonId: PaintingAddonId, quantity?: number) => void;
   updateAddonQuantity: (addonId: PaintingAddonId, quantity: number) => void;
   removeAddon: (addonId: PaintingAddonId) => void;
-  setAddonPriceOverride: (addonId: PaintingAddonId, override: number | undefined) => void;
+  setAddonPriceOverride: (
+    addonId: PaintingAddonId,
+    override: number | undefined
+  ) => void;
   // Custom addon management
-  addCustomAddon: (name: string, price: number, unit: AddonUnit, quantity?: number) => void;
-  updateCustomAddon: (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => void;
+  addCustomAddon: (
+    name: string,
+    price: number,
+    unit: AddonUnit,
+    quantity?: number
+  ) => void;
+  updateCustomAddon: (
+    id: string,
+    updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>
+  ) => void;
   removeCustomAddon: (id: string) => void;
   // Square footage (for standalone or override)
   setTotalSqft: (sqft: number) => void;

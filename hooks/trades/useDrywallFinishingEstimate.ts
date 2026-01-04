@@ -47,6 +47,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   const [customAddons, setCustomAddons] = useState<CustomAddon[]>([]);
   const [materials, setMaterials] = useState<FinishingMaterialEntry[]>([]);
   const [complexity, setComplexity] = useState<DrywallComplexity>("standard");
+  const [directHours, setDirectHoursState] = useState<number>(0);
 
   // Get hourly rate from profile or use default
   const hourlyRate = profile?.hourly_rate ?? 75;
@@ -198,7 +199,8 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
           if (!addonDef) return addon;
 
           // Use override or custom price from settings or default
-          const price = addon.priceOverride ?? getUserAddonPrice(addonId, customRates);
+          const price =
+            addon.priceOverride ?? getUserAddonPrice(addonId, customRates);
           const total =
             addonDef.unit === "sqft" || addonDef.unit === "each"
               ? price * quantity
@@ -257,12 +259,18 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
   );
 
   const updateCustomAddon = useCallback(
-    (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => {
+    (
+      id: string,
+      updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>
+    ) => {
       setCustomAddons((prev) =>
         prev.map((addon) => {
           if (addon.id !== id) return addon;
           const updated = { ...addon, ...updates };
-          updated.total = updated.unit === "flat" ? updated.price : updated.price * updated.quantity;
+          updated.total =
+            updated.unit === "flat"
+              ? updated.price
+              : updated.price * updated.quantity;
           return updated;
         })
       );
@@ -531,6 +539,11 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     []
   );
 
+  // Direct hours setter
+  const setDirectHours = useCallback((hours: number) => {
+    setDirectHoursState(hours);
+  }, []);
+
   // Reset all state
   const reset = useCallback(() => {
     setFinishLevel(4);
@@ -539,6 +552,7 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     setCustomAddons([]);
     setMaterials([]);
     setComplexity("standard");
+    setDirectHoursState(0);
   }, []);
 
   // Calculate totals
@@ -548,15 +562,24 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
       (sum, item) => sum + item.materialTotal,
       0
     );
-    const laborSubtotal = lineItems.reduce(
+    const lineItemsLabor = lineItems.reduce(
       (sum, item) => sum + item.laborTotal,
       0
     );
+    // Add direct hours labor
+    const hoursLabor = directHours * hourlyRate;
+    const laborSubtotal = lineItemsLabor + hoursLabor;
     const lineItemsSubtotal = materialSubtotal + laborSubtotal;
 
     // Addons subtotal (including custom addons)
-    const predefinedAddonsTotal = addons.reduce((sum, addon) => sum + addon.total, 0);
-    const customAddonsTotal = customAddons.reduce((sum, addon) => sum + addon.total, 0);
+    const predefinedAddonsTotal = addons.reduce(
+      (sum, addon) => sum + addon.total,
+      0
+    );
+    const customAddonsTotal = customAddons.reduce(
+      (sum, addon) => sum + addon.total,
+      0
+    );
     const addonsSubtotal = predefinedAddonsTotal + customAddonsTotal;
 
     // Manual materials subtotal
@@ -629,7 +652,15 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
         high: Math.round(rangeHigh),
       },
     };
-  }, [lineItems, addons, customAddons, materials, complexity]);
+  }, [
+    lineItems,
+    addons,
+    customAddons,
+    materials,
+    complexity,
+    directHours,
+    hourlyRate,
+  ]);
 
   return {
     // Data
@@ -639,12 +670,14 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     customAddons,
     materials,
     complexity,
+    directHours,
     totals,
     defaultRates,
     defaultAddonPrices,
     hourlyRate,
     // Actions
     setFinishLevel,
+    setDirectHours,
     addLineItem,
     updateLineItem,
     removeLineItem,
