@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { Calculator, Grid3X3, Hammer } from "lucide-react";
+import { Calculator, Grid3X3, Hammer, FileText } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import { HangingInputMode } from "@/lib/trades/drywallHanging/types";
@@ -30,7 +30,15 @@ const INPUT_MODES = [
   },
 ];
 
-export function HangingInputModeStep() {
+interface HangingInputModeStepProps {
+  estimateName?: string;
+  onEstimateNameChange?: (name: string) => void;
+}
+
+export function HangingInputModeStep({
+  estimateName = "",
+  onEstimateNameChange,
+}: HangingInputModeStepProps) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const { inputMode, setInputMode, addRoom } = useHangingEstimate();
@@ -60,6 +68,26 @@ export function HangingInputModeStep() {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4">
+      {/* Estimate Name Input */}
+      {onEstimateNameChange && (
+        <div className="mb-8">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+            <FileText className="w-4 h-4" />
+            Estimate Name (optional)
+          </label>
+          <input
+            type="text"
+            value={estimateName}
+            onChange={(e) => onEstimateNameChange(e.target.value)}
+            placeholder="e.g., Smith Kitchen Remodel"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <p className="mt-1.5 text-sm text-gray-500">
+            Give your estimate a name to find it later
+          </p>
+        </div>
+      )}
+
       <StepHeader
         title="How would you like to estimate?"
         description="Choose your preferred method"

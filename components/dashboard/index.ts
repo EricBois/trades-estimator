@@ -1,1 +1,0 @@
-export { QuickTemplatesSection } from "./QuickTemplatesSection";

@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
-import { Layers } from "lucide-react";
+import { Layers, FileText } from "lucide-react";
 import { useDrywallEstimateSafe } from "./DrywallEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import { DRYWALL_FINISH_LEVELS } from "@/lib/trades/drywallFinishing/constants";
@@ -12,11 +12,17 @@ import {
 } from "@/lib/trades/drywallFinishing/types";
 import { cn } from "@/lib/utils";
 
+interface DrywallFinishLevelStepProps {
+  finishingEstimate?: UseDrywallFinishingEstimateReturn;
+  estimateName?: string;
+  onEstimateNameChange?: (name: string) => void;
+}
+
 export function DrywallFinishLevelStep({
   finishingEstimate,
-}: {
-  finishingEstimate?: UseDrywallFinishingEstimateReturn;
-} = {}) {
+  estimateName = "",
+  onEstimateNameChange,
+}: DrywallFinishLevelStepProps) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
 
@@ -51,6 +57,26 @@ export function DrywallFinishLevelStep({
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6">
+      {/* Estimate Name Input */}
+      {onEstimateNameChange && (
+        <div className="mb-8">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+            <FileText className="w-4 h-4" />
+            Estimate Name (optional)
+          </label>
+          <input
+            type="text"
+            value={estimateName}
+            onChange={(e) => onEstimateNameChange(e.target.value)}
+            placeholder="e.g., Smith Kitchen Remodel"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <p className="mt-1.5 text-sm text-gray-500">
+            Give your estimate a name to find it later
+          </p>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
         Finish Level
       </h1>

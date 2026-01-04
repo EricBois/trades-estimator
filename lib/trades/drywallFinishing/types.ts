@@ -186,6 +186,15 @@ export interface DrywallEstimateActions {
   removeMaterial: (id: string) => void;
   setMaterialPriceOverride: (id: string, override: number | undefined) => void;
   reset: () => void;
+  hydrateFromSaved: (params: {
+    finishLevel?: DrywallFinishLevel;
+    lineItems?: DrywallLineItem[];
+    addons?: DrywallSelectedAddon[];
+    customAddons?: CustomAddon[];
+    materials?: FinishingMaterialEntry[];
+    complexity?: DrywallComplexity;
+    directHours?: number;
+  }) => void;
 }
 
 // Full hook return type

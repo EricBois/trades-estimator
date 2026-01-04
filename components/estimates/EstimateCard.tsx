@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   User,
   Mail,
@@ -12,14 +15,27 @@ import {
   XCircle,
   AlertCircle,
   FileEdit,
+  Pencil,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import { useDeleteEstimate } from "@/hooks";
 import type { Estimate } from "@/hooks";
 import { formatDate, formatRelative, isExpired, cn } from "@/lib/utils";
-import { TRADE_TYPES } from "@/lib/constants";
+
+// Trade type labels for display
+const TRADE_LABELS: Record<string, string> = {
+  drywall_hanging: "Drywall Hanging",
+  drywall_finishing: "Drywall Finishing",
+  painting: "Painting",
+  framing: "Framing",
+  multi_trade: "Multi-Trade Project",
+};
 
 interface EstimateCardProps {
   estimate: Estimate;
   className?: string;
+  onDelete?: (id: string) => void;
 }
 
 const STATUS_CONFIG = {
@@ -61,10 +77,19 @@ const STATUS_CONFIG = {
   },
 } as const;
 
-export function EstimateCard({ estimate, className }: EstimateCardProps) {
+export function EstimateCard({
+  estimate,
+  className,
+  onDelete,
+}: EstimateCardProps) {
+  const router = useRouter();
+  const deleteEstimate = useDeleteEstimate();
+
   const tradeLabel =
-    TRADE_TYPES.find((t) => t.value === estimate.templateType)?.label ??
-    estimate.templateType;
+    TRADE_LABELS[estimate.templateType] ??
+    estimate.templateType
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
 
   const effectiveStatus =
     estimate.status === "sent" && isExpired(estimate.expiresAt)
@@ -75,6 +100,28 @@ export function EstimateCard({ estimate, className }: EstimateCardProps) {
     STATUS_CONFIG[effectiveStatus as keyof typeof STATUS_CONFIG] ??
     STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
+
+  // Show edit/delete only for draft standalone estimates (not project estimates)
+  const canEditDelete = estimate.status === "draft" && !estimate.projectId;
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/estimates/${estimate.id}/edit`);
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this estimate?")) {
+      await deleteEstimate.mutateAsync(estimate.id);
+      onDelete?.(estimate.id);
+      router.refresh();
+    }
+  };
+
+  // Display name or fallback to homeowner name
+  const displayName = estimate.name || estimate.homeownerName;
 
   return (
     <Link
@@ -87,20 +134,32 @@ export function EstimateCard({ estimate, className }: EstimateCardProps) {
       <div className="flex items-start justify-between gap-4">
         {/* Left side - Main info */}
         <div className="flex-1 min-w-0 space-y-3">
-          {/* Header */}
+          {/* Header - show name if present */}
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-gray-400" />
             <span className="font-semibold text-gray-900 truncate">
-              {estimate.homeownerName}
+              {displayName}
             </span>
           </div>
 
+          {/* Show homeowner info if name is different */}
+          {estimate.name && estimate.homeownerName && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+              <span className="inline-flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" />
+                {estimate.homeownerName}
+              </span>
+            </div>
+          )}
+
           {/* Contact info */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-            <span className="inline-flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5" />
-              {estimate.homeownerEmail}
-            </span>
+            {estimate.homeownerEmail && (
+              <span className="inline-flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5" />
+                {estimate.homeownerEmail}
+              </span>
+            )}
             {estimate.homeownerPhone && (
               <span className="inline-flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" />
@@ -172,6 +231,31 @@ export function EstimateCard({ estimate, className }: EstimateCardProps) {
               })}
             </div>
           </div>
+
+          {/* Action buttons for draft standalone estimates */}
+          {canEditDelete && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleEdit}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteEstimate.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+              >
+                {deleteEstimate.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Delete
+              </button>
+            </div>
+          )}
 
           {/* Arrow */}
           <ChevronRight className="w-5 h-5 text-gray-400" />

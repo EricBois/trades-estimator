@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from "react";
 
 interface Template {
   id: string;
@@ -20,6 +27,7 @@ interface WizardData {
   template: Template | null;
   parameters: Record<string, string | number>;
   complexity: string;
+  estimateName: string;
   homeownerName: string;
   homeownerEmail: string;
   homeownerPhone: string;
@@ -39,6 +47,7 @@ const initialWizardData: WizardData = {
   template: null,
   parameters: {},
   complexity: "standard",
+  estimateName: "",
   homeownerName: "",
   homeownerEmail: "",
   homeownerPhone: "",

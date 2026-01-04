@@ -8,7 +8,8 @@ import { WizardFooterProvider, useWizardFooter } from "../WizardFooterContext";
 import { WizardOuterLayout } from "../WizardLayout";
 import { WizardStepper } from "@/components/ui/WizardStepper";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCreateProject, useCreateEstimate } from "@/hooks";
+import { useCreateProject, useUpdateProject, useCreateEstimate } from "@/hooks";
+import { createClient } from "@/lib/supabase/client";
 import {
   ProjectEstimateProvider,
   useProjectEstimateContext,
@@ -81,6 +82,7 @@ function SaveDraftHandler() {
   const { user } = useAuth();
   const { setGlobalSaveDraft } = useWizardFooter();
   const {
+    projectId,
     projectName,
     enabledTrades,
     tradeTotals,
@@ -91,23 +93,53 @@ function SaveDraftHandler() {
   } = useProjectEstimateContext();
 
   const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
   const createEstimate = useCreateEstimate();
+
+  // Check if this is an existing project (valid UUID format)
+  const isExistingProject =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      projectId
+    );
 
   const saveDraft = useCallback(async () => {
     if (!user) return;
 
-    // 1. Create the project as draft (no homeowner info required)
-    const project = await createProject.mutateAsync({
-      contractorId: user.id,
-      name: projectName || "Untitled Project",
-    });
+    let targetProjectId: string;
 
-    // 2. Save rooms to the new project
-    if (roomsHook.rooms.length > 0) {
-      await roomsHook.saveRooms(project.id);
+    if (isExistingProject) {
+      // Update existing project
+      await updateProject.mutateAsync({
+        id: projectId,
+        name: projectName || "Untitled Project",
+      });
+      targetProjectId = projectId;
+    } else {
+      // Create new project
+      const project = await createProject.mutateAsync({
+        contractorId: user.id,
+        name: projectName || "Untitled Project",
+      });
+      targetProjectId = project.id;
     }
 
-    // 3. Create estimates for each enabled trade
+    // Save rooms (this handles delete + insert for the target project)
+    if (roomsHook.rooms.length > 0) {
+      await roomsHook.saveRooms(
+        isExistingProject ? undefined : targetProjectId
+      );
+    }
+
+    // For existing projects, delete old estimates first
+    if (isExistingProject) {
+      const supabase = createClient();
+      await supabase
+        .from("estimates")
+        .delete()
+        .eq("project_id", targetProjectId);
+    }
+
+    // Create estimates for each enabled trade
     for (const tradeType of enabledTrades) {
       const totals = tradeTotals[tradeType];
       if (!totals) continue;
@@ -153,7 +185,7 @@ function SaveDraftHandler() {
         parameters,
         rangeLow: totals.total,
         rangeHigh: totals.total,
-        projectId: project.id,
+        projectId: targetProjectId,
       });
     }
 
@@ -161,7 +193,10 @@ function SaveDraftHandler() {
     router.push("/estimates");
   }, [
     user,
+    isExistingProject,
+    projectId,
     createProject,
+    updateProject,
     projectName,
     roomsHook,
     enabledTrades,

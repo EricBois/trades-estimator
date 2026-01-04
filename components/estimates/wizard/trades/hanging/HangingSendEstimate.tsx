@@ -11,7 +11,14 @@ import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
 
-export function HangingSendEstimate() {
+interface HangingSendEstimateProps {
+  estimateId?: string;
+  estimateName?: string;
+}
+
+export function HangingSendEstimate({
+  estimateName,
+}: HangingSendEstimateProps) {
   const router = useRouter();
   const { profile } = useAuth();
   const { setFooterConfig } = useWizardFooter();
@@ -108,6 +115,7 @@ export function HangingSendEstimate() {
       const estimate = await createEstimate.mutateAsync({
         contractorId: profile.id,
         templateType: "drywall_hanging",
+        name: estimateName?.trim() || undefined,
         homeownerName: homeownerName.trim(),
         homeownerEmail: homeownerEmail.trim(),
         homeownerPhone: homeownerPhone.trim() || undefined,
@@ -137,6 +145,7 @@ export function HangingSendEstimate() {
     wasteFactor,
     totals,
     createEstimate,
+    estimateName,
     homeownerName,
     homeownerEmail,
     homeownerPhone,

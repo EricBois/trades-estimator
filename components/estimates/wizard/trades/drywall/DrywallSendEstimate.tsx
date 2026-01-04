@@ -11,7 +11,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 
-export function DrywallSendEstimate() {
+interface DrywallSendEstimateProps {
+  estimateId?: string;
+  estimateName?: string;
+}
+
+export function DrywallSendEstimate({
+  estimateName,
+}: DrywallSendEstimateProps) {
   const router = useRouter();
   const { profile } = useAuth();
   const { setFooterConfig } = useWizardFooter();
@@ -74,6 +81,7 @@ export function DrywallSendEstimate() {
       const estimate = await createEstimate.mutateAsync({
         contractorId: profile.id,
         templateType: "drywall_finishing",
+        name: estimateName?.trim() || undefined,
         homeownerName: homeownerName.trim(),
         homeownerEmail: homeownerEmail.trim(),
         homeownerPhone: homeownerPhone.trim() || undefined,
@@ -102,6 +110,7 @@ export function DrywallSendEstimate() {
     complexity,
     totals,
     createEstimate,
+    estimateName,
     homeownerName,
     homeownerEmail,
     homeownerPhone,

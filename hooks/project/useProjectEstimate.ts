@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   ProjectTradeType,
   ProjectTotals,
@@ -15,6 +15,8 @@ import { useProjectRooms } from "./useProjectRooms";
 import { useDrywallHangingEstimate } from "@/hooks/trades/useDrywallHangingEstimate";
 import { useDrywallFinishingEstimate } from "@/hooks/trades/useDrywallFinishingEstimate";
 import { usePaintingEstimate } from "@/hooks/trades/usePaintingEstimate";
+
+const supabase = createClient();
 
 // Generate unique ID
 function generateId(): string {
@@ -159,7 +161,8 @@ export function useProjectEstimate(
   // Sync square footage to trade hooks when rooms change
   // Uses trade-specific room views to respect wall/ceiling overrides per trade
   const syncSqftToTrades = useCallback(() => {
-    const hasRooms = roomsHook.inputMode === "rooms" && roomsHook.rooms.length > 0;
+    const hasRooms =
+      roomsHook.inputMode === "rooms" && roomsHook.rooms.length > 0;
 
     // Sync to hanging estimate - uses gross sqft (no openings deducted)
     // Uses setFromRooms to track wall/ceiling breakdown for ceiling height multiplier
@@ -298,6 +301,175 @@ export function useProjectEstimate(
     finishingEstimate.reset();
     paintingEstimate.reset();
   }, [roomsHook, hangingEstimate, finishingEstimate, paintingEstimate]);
+
+  // Track if we've loaded existing project data
+  const hasLoadedRef = useRef(false);
+
+  // Load existing project data when editing
+  useEffect(() => {
+    // Only load once and only if we have a projectId that looks like an existing project
+    if (!initialProjectId || hasLoadedRef.current) return;
+
+    // Check if projectId looks like a UUID (existing project)
+    const isValidUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        initialProjectId
+      );
+    if (!isValidUUID) return;
+
+    const loadProject = async () => {
+      try {
+        // Load project details
+        const { data: project, error: projectError } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("id", initialProjectId)
+          .single();
+
+        if (projectError || !project) {
+          console.error("Failed to load project:", projectError);
+          return;
+        }
+
+        // Set project name
+        setProjectName(project.name);
+
+        // Load rooms
+        await roomsHook.loadRooms();
+
+        // Load estimates for this project
+        const { data: estimates, error: estimatesError } = await supabase
+          .from("estimates")
+          .select("*")
+          .eq("project_id", initialProjectId);
+
+        if (estimatesError) {
+          console.error("Failed to load estimates:", estimatesError);
+          return;
+        }
+
+        // Determine enabled trades from existing estimates
+        const trades = (estimates ?? [])
+          .map((e) => e.template_type as ProjectTradeType)
+          .filter((t) =>
+            ["drywall_hanging", "drywall_finishing", "painting"].includes(t)
+          );
+
+        if (trades.length > 0) {
+          setEnabledTrades(trades);
+        }
+
+        // Hydrate each trade estimate from saved parameters
+        for (const estimate of estimates ?? []) {
+          const params = estimate.parameters as Record<string, unknown> | null;
+          if (!params) continue;
+
+          if (estimate.template_type === "drywall_hanging") {
+            // Hydrate hanging estimate
+            if (params.inputMode) {
+              hangingEstimate.setInputMode(
+                params.inputMode as "calculator" | "direct" | "labor_only"
+              );
+            }
+            if (params.pricingMethod) {
+              hangingEstimate.setPricingMethod(
+                params.pricingMethod as "per_sheet" | "per_sqft"
+              );
+            }
+            if (params.ceilingFactor) {
+              hangingEstimate.setCeilingFactor(
+                params.ceilingFactor as
+                  | "standard"
+                  | "nine_ft"
+                  | "ten_ft"
+                  | "cathedral"
+              );
+            }
+            if (typeof params.wasteFactor === "number") {
+              hangingEstimate.setWasteFactor(params.wasteFactor);
+            }
+            if (params.complexity) {
+              hangingEstimate.setComplexity(
+                params.complexity as "simple" | "standard" | "complex"
+              );
+            }
+            // Hydrate addons - use type assertion since addon IDs are validated by the hook
+            const savedAddons = params.addons as
+              | Array<{ id: string; quantity: number }>
+              | undefined;
+            if (savedAddons && Array.isArray(savedAddons)) {
+              for (const addon of savedAddons) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                hangingEstimate.toggleAddon(addon.id as any, addon.quantity);
+              }
+            }
+          } else if (estimate.template_type === "drywall_finishing") {
+            // Hydrate finishing estimate
+            if (typeof params.finishLevel === "number") {
+              finishingEstimate.setFinishLevel(params.finishLevel as 3 | 4 | 5);
+            }
+            if (params.complexity) {
+              finishingEstimate.setComplexity(
+                params.complexity as "simple" | "standard" | "complex"
+              );
+            }
+            // Hydrate addons
+            const savedAddons = params.addons as
+              | Array<{ id: string; quantity: number }>
+              | undefined;
+            if (savedAddons && Array.isArray(savedAddons)) {
+              for (const addon of savedAddons) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                finishingEstimate.toggleAddon(addon.id as any, addon.quantity);
+              }
+            }
+          } else if (estimate.template_type === "painting") {
+            // Hydrate painting estimate
+            if (typeof params.coatCount === "number") {
+              paintingEstimate.setCoatCount(params.coatCount as 1 | 2 | 3);
+            }
+            if (params.paintQuality) {
+              paintingEstimate.setPaintQuality(
+                params.paintQuality as "standard" | "premium" | "specialty"
+              );
+            }
+            if (params.surfacePrep) {
+              paintingEstimate.setSurfacePrep(
+                params.surfacePrep as "none" | "light" | "heavy"
+              );
+            }
+            if (params.complexity) {
+              paintingEstimate.setComplexity(
+                params.complexity as "simple" | "standard" | "complex"
+              );
+            }
+            // Hydrate addons
+            const savedAddons = params.addons as
+              | Array<{ id: string; quantity: number }>
+              | undefined;
+            if (savedAddons && Array.isArray(savedAddons)) {
+              for (const addon of savedAddons) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                paintingEstimate.toggleAddon(addon.id as any, addon.quantity);
+              }
+            }
+          }
+        }
+
+        hasLoadedRef.current = true;
+      } catch (err) {
+        console.error("Error loading project:", err);
+      }
+    };
+
+    loadProject();
+  }, [
+    initialProjectId,
+    roomsHook,
+    hangingEstimate,
+    finishingEstimate,
+    paintingEstimate,
+  ]);
 
   return {
     // Project data

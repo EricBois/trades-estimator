@@ -35,7 +35,7 @@ const PRICING_TYPE_STYLES: Record<
 export function TemplateStep() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
-  const { tradeType, setTemplate } = useWizardData();
+  const { tradeType, setTemplate, estimateName, updateData } = useWizardData();
   const { data: userTemplates, isLoading } = useTemplates();
 
   // Configure footer (Continue is disabled since user must select a template)
@@ -112,6 +112,24 @@ export function TemplateStep() {
 
   return (
     <div className="w-full max-w-lg mx-auto px-4">
+      {/* Estimate Name Input */}
+      <div className="mb-8">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+          <FileText className="w-4 h-4" />
+          Estimate Name (optional)
+        </label>
+        <input
+          type="text"
+          value={estimateName}
+          onChange={(e) => updateData({ estimateName: e.target.value })}
+          placeholder="e.g., Smith Kitchen Remodel"
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <p className="mt-1.5 text-sm text-gray-500">
+          Give your estimate a name to find it later
+        </p>
+      </div>
+
       <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
         What kind of work?
       </h1>

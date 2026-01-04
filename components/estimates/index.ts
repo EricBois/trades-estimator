@@ -6,3 +6,4 @@ export {
   EstimateCardSkeleton,
 } from "./EstimateCard";
 export { EstimateWizard, WizardRouter } from "./wizard";
+export { ProjectEstimateGroup } from "./ProjectEstimateGroup";

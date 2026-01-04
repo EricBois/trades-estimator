@@ -31,6 +31,8 @@ export function WizardNavigation() {
     setIsSavingDraft(true);
     try {
       await saveDraft();
+    } catch (error) {
+      console.error("Save draft failed:", error);
     } finally {
       setIsSavingDraft(false);
     }

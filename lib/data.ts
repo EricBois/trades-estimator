@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Estimate, Template } from "@/hooks";
+import type { Project, ProjectStatus } from "@/lib/project/types";
 
 // Transform database row to Estimate
 function toEstimate(e: {
@@ -8,6 +9,7 @@ function toEstimate(e: {
   contractor_id: string;
   template_type: string;
   template_id: string | null;
+  name?: string | null;
   homeowner_name: string;
   homeowner_email: string;
   homeowner_phone: string | null;
@@ -19,12 +21,14 @@ function toEstimate(e: {
   expires_at: string | null;
   created_at: string | null;
   updated_at: string | null;
+  project_id: string | null;
 }): Estimate {
   return {
     id: e.id,
     contractorId: e.contractor_id,
     templateType: e.template_type,
     templateId: e.template_id,
+    name: e.name ?? null,
     homeownerName: e.homeowner_name,
     homeownerEmail: e.homeowner_email,
     homeownerPhone: e.homeowner_phone,
@@ -36,6 +40,7 @@ function toEstimate(e: {
     expiresAt: e.expires_at,
     createdAt: e.created_at ?? new Date().toISOString(),
     updatedAt: e.updated_at ?? new Date().toISOString(),
+    projectId: e.project_id,
   };
 }
 
@@ -59,7 +64,10 @@ function toTemplate(t: {
     description: t.description,
     baseLaborHours: t.base_labor_hours,
     baseMaterialCost: t.base_material_cost,
-    complexityMultipliers: t.complexity_multipliers as Record<string, number> | null,
+    complexityMultipliers: t.complexity_multipliers as Record<
+      string,
+      number
+    > | null,
     requiredFields: t.required_fields as Record<string, unknown> | null,
   };
 }
@@ -85,7 +93,14 @@ function toProfile(p: {
     preferredTradeTypes: p.trade_type ? [p.trade_type] : null,
     hiddenTemplateIds: p.hidden_template_ids ?? [],
     templatesOnboarded: p.templates_onboarded ?? false,
-    customRates: p.custom_rates as { drywall_finishing?: { sqft_standard?: number; sqft_premium?: number; linear_joints?: number; linear_corners?: number } } | null,
+    customRates: p.custom_rates as {
+      drywall_finishing?: {
+        sqft_standard?: number;
+        sqft_premium?: number;
+        linear_joints?: number;
+        linear_corners?: number;
+      };
+    } | null,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };
@@ -94,7 +109,9 @@ function toProfile(p: {
 // Get current user and profile, redirect to login if not authenticated
 export async function getAuthenticatedUser() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
@@ -177,26 +194,37 @@ export async function getDashboardStats() {
   const { user, profile } = await getAuthenticatedUser();
   const supabase = await createClient();
 
-  const { data: estimates } = await supabase
-    .from("estimates")
-    .select("*")
-    .eq("contractor_id", user.id)
-    .order("created_at", { ascending: false });
+  // Fetch estimates and projects in parallel
+  const [estimatesResult, projectsResult] = await Promise.all([
+    supabase
+      .from("estimates")
+      .select("*")
+      .eq("contractor_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("projects")
+      .select("*")
+      .eq("contractor_id", user.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
-  const allEstimates = estimates?.map(toEstimate) ?? [];
+  const allEstimates = estimatesResult.data?.map(toEstimate) ?? [];
+  const allProjects = projectsResult.data?.map(toProject) ?? [];
 
   const stats = {
-    total: allEstimates.length,
-    draft: allEstimates.filter(e => e.status === "draft").length,
-    sent: allEstimates.filter(e => e.status === "sent").length,
-    accepted: allEstimates.filter(e => e.status === "accepted").length,
-    declined: allEstimates.filter(e => e.status === "declined").length,
-    viewed: allEstimates.filter(e => e.status === "viewed").length,
+    totalProjects: allProjects.length,
+    totalEstimates: allEstimates.length,
+    accepted: allProjects.filter((p) => p.status === "accepted").length,
+    sent: allProjects.filter((p) => p.status === "sent").length,
   };
 
-  const recentEstimates = allEstimates.slice(0, 5);
+  // Get recent projects (up to 5)
+  const recentProjects = allProjects.slice(0, 5);
 
-  return { stats, recentEstimates, profile };
+  // Get standalone estimates (no project) for display
+  const standaloneEstimates = allEstimates.filter((e) => !e.projectId).slice(0, 5);
+
+  return { stats, recentProjects, standaloneEstimates, allEstimates, profile };
 }
 
 // Get default templates only (contractor_id = null)
@@ -212,4 +240,54 @@ export async function getDefaultTemplates(): Promise<Template[]> {
 
   if (error) throw error;
   return data?.map(toTemplate) ?? [];
+}
+
+// Transform database row to Project
+function toProject(row: {
+  id: string;
+  contractor_id: string;
+  name: string;
+  homeowner_name: string;
+  homeowner_email: string;
+  homeowner_phone: string | null;
+  project_description: string | null;
+  status: string | null;
+  range_low: number | null;
+  range_high: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  expires_at: string | null;
+  viewed_at: string | null;
+}): Project {
+  return {
+    id: row.id,
+    contractorId: row.contractor_id,
+    name: row.name,
+    homeownerName: row.homeowner_name,
+    homeownerEmail: row.homeowner_email,
+    homeownerPhone: row.homeowner_phone,
+    projectDescription: row.project_description,
+    status: (row.status ?? "draft") as ProjectStatus,
+    rangeLow: row.range_low ?? 0,
+    rangeHigh: row.range_high ?? 0,
+    createdAt: row.created_at ?? new Date().toISOString(),
+    updatedAt: row.updated_at ?? new Date().toISOString(),
+    expiresAt: row.expires_at,
+    viewedAt: row.viewed_at,
+  };
+}
+
+// Get projects for authenticated user
+export async function getProjects(): Promise<Project[]> {
+  const { user } = await getAuthenticatedUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("contractor_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data?.map(toProject) ?? [];
 }

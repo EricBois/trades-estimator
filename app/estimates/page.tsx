@@ -1,4 +1,4 @@
-import { getEstimates } from "@/lib/data";
+import { getEstimates, getProjects } from "@/lib/data";
 import { EstimatesContent } from "./EstimatesContent";
 
 interface PageProps {
@@ -6,14 +6,16 @@ interface PageProps {
 }
 
 export default async function EstimatesPage({ searchParams }: PageProps) {
-  const [{ status }, estimates] = await Promise.all([
+  const [{ status }, estimates, projects] = await Promise.all([
     searchParams,
     getEstimates(),
+    getProjects(),
   ]);
 
   return (
     <EstimatesContent
       estimates={estimates}
+      projects={projects}
       initialStatus={status ?? "all"}
     />
   );

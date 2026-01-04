@@ -262,6 +262,21 @@ export interface DrywallHangingEstimateActions {
   ) => void;
   // Reset
   reset: () => void;
+  // Hydrate from saved parameters
+  hydrateFromSaved: (params: {
+    inputMode?: HangingInputMode;
+    pricingMethod?: HangingPricingMethod;
+    clientSuppliesMaterials?: boolean;
+    directSqft?: number;
+    directHours?: number;
+    rooms?: HangingRoom[];
+    sheets?: HangingSheetEntry[];
+    ceilingFactor?: CeilingHeightFactor;
+    wasteFactor?: number;
+    complexity?: HangingComplexity;
+    addons?: HangingSelectedAddon[];
+    customAddons?: CustomAddon[];
+  }) => void;
 }
 
 // Full hook return type

@@ -555,6 +555,29 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     setDirectHoursState(0);
   }, []);
 
+  // Hydrate state from saved parameters (for editing existing estimates)
+  const hydrateFromSaved = useCallback(
+    (params: {
+      finishLevel?: DrywallFinishLevel;
+      lineItems?: DrywallLineItem[];
+      addons?: DrywallSelectedAddon[];
+      customAddons?: CustomAddon[];
+      materials?: FinishingMaterialEntry[];
+      complexity?: DrywallComplexity;
+      directHours?: number;
+    }) => {
+      if (params.finishLevel !== undefined) setFinishLevel(params.finishLevel);
+      if (params.lineItems) setLineItems(params.lineItems);
+      if (params.addons) setAddons(params.addons);
+      if (params.customAddons) setCustomAddons(params.customAddons);
+      if (params.materials) setMaterials(params.materials);
+      if (params.complexity) setComplexity(params.complexity);
+      if (params.directHours !== undefined)
+        setDirectHoursState(params.directHours);
+    },
+    []
+  );
+
   // Calculate totals
   const totals = useMemo((): DrywallEstimateTotals => {
     // Material and labor subtotals (from line items)
@@ -699,5 +722,6 @@ export function useDrywallFinishingEstimate(): UseDrywallFinishingEstimateReturn
     removeMaterial,
     setMaterialPriceOverride,
     reset,
+    hydrateFromSaved,
   };
 }

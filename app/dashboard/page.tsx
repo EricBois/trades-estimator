@@ -2,12 +2,15 @@ import { getDashboardStats } from "@/lib/data";
 import { DashboardContent } from "./DashboardContent";
 
 export default async function DashboardPage() {
-  const { stats, recentEstimates, profile } = await getDashboardStats();
+  const { stats, recentProjects, standaloneEstimates, allEstimates, profile } =
+    await getDashboardStats();
 
   return (
     <DashboardContent
       stats={stats}
-      recentEstimates={recentEstimates}
+      recentProjects={recentProjects}
+      standaloneEstimates={standaloneEstimates}
+      allEstimates={allEstimates}
       profile={profile}
     />
   );

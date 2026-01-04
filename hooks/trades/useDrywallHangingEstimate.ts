@@ -891,6 +891,41 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     setCustomAddons([]);
   }, [customRates]);
 
+  // Hydrate state from saved parameters (for editing existing estimates)
+  const hydrateFromSaved = useCallback(
+    (params: {
+      inputMode?: HangingInputMode;
+      pricingMethod?: HangingPricingMethod;
+      clientSuppliesMaterials?: boolean;
+      directSqft?: number;
+      directHours?: number;
+      rooms?: HangingRoom[];
+      sheets?: HangingSheetEntry[];
+      ceilingFactor?: CeilingHeightFactor;
+      wasteFactor?: number;
+      complexity?: HangingComplexity;
+      addons?: HangingSelectedAddon[];
+      customAddons?: CustomAddon[];
+    }) => {
+      if (params.inputMode) setInputModeState(params.inputMode);
+      if (params.pricingMethod) setPricingMethod(params.pricingMethod);
+      if (params.clientSuppliesMaterials !== undefined)
+        setClientSuppliesMaterialsState(params.clientSuppliesMaterials);
+      if (params.directSqft !== undefined)
+        setDirectSqftState(params.directSqft);
+      if (params.directHours !== undefined)
+        setDirectHoursState(params.directHours);
+      if (params.rooms) setRooms(params.rooms);
+      if (params.sheets) setSheets(params.sheets);
+      if (params.ceilingFactor) setCeilingFactor(params.ceilingFactor);
+      if (params.wasteFactor !== undefined) setWasteFactor(params.wasteFactor);
+      if (params.complexity) setComplexity(params.complexity);
+      if (params.addons) setAddons(params.addons);
+      if (params.customAddons) setCustomAddons(params.customAddons);
+    },
+    []
+  );
+
   // Calculate totals
   const totals = useMemo((): HangingEstimateTotals => {
     // Get labor per sqft rate for per_sqft pricing
@@ -1152,5 +1187,6 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     setSheetLaborCostOverride,
     setAddonPriceOverride,
     reset,
+    hydrateFromSaved,
   };
 }

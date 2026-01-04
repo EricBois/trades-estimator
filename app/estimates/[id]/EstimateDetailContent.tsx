@@ -12,18 +12,200 @@ import {
   DollarSign,
   Send,
   Trash2,
-  Edit,
+  Pencil,
   CheckCircle,
   XCircle,
   Eye,
   FileEdit,
   Loader2,
   AlertCircle,
+  Edit,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { useUpdateEstimate, useDeleteEstimate } from "@/hooks";
-import { TRADE_TYPES } from "@/lib/constants";
 import { formatDate, formatRelative, isExpired, cn } from "@/lib/utils";
+
+// Trade type labels for display
+const TRADE_LABELS: Record<string, string> = {
+  drywall_hanging: "Drywall Hanging",
+  drywall_finishing: "Drywall Finishing",
+  painting: "Painting",
+  framing: "Framing",
+  multi_trade: "Multi-Trade Project",
+};
+
+// Helper to format sheet info
+function formatSheets(sheets: unknown): string | null {
+  if (!Array.isArray(sheets) || sheets.length === 0) return null;
+
+  const totalSheets = sheets.reduce((sum, s) => sum + (s.quantity || 0), 0);
+  if (totalSheets === 0) return null;
+
+  // Get the primary sheet type
+  const primary = sheets[0];
+  const typeLabels: Record<string, string> = {
+    standard_half: '1/2" Standard',
+    standard_5_8: '5/8" Standard',
+    fire_rated: "Fire Rated",
+    moisture_resistant: "Moisture Resistant",
+    mold_resistant: "Mold Resistant",
+  };
+  const typeLabel = typeLabels[primary.typeId] || primary.typeId;
+
+  return `${totalSheets} sheets (${typeLabel}, ${primary.size || "4x8"})`;
+}
+
+// Helper to format complexity
+function formatComplexity(complexity: unknown): string {
+  const labels: Record<string, string> = {
+    simple: "Simple",
+    standard: "Standard",
+    complex: "Complex",
+  };
+  return labels[String(complexity)] || String(complexity);
+}
+
+// Helper to format ceiling factor
+function formatCeilingFactor(factor: unknown): string {
+  const labels: Record<string, string> = {
+    standard: "Standard (8')",
+    nine_ft: "9' Ceilings",
+    ten_ft: "10' Ceilings",
+    cathedral: "Cathedral/Vaulted",
+  };
+  return labels[String(factor)] || String(factor);
+}
+
+// Helper to format finish level
+function formatFinishLevel(level: unknown): string {
+  const labels: Record<number, string> = {
+    3: "Level 3 - Standard",
+    4: "Level 4 - Premium",
+    5: "Level 5 - Smooth Wall",
+  };
+  return labels[Number(level)] || `Level ${level}`;
+}
+
+// Helper to format paint quality
+function formatPaintQuality(quality: unknown): string {
+  const labels: Record<string, string> = {
+    standard: "Standard",
+    premium: "Premium",
+    specialty: "Specialty",
+  };
+  return labels[String(quality)] || String(quality);
+}
+
+// Helper to format surface prep
+function formatSurfacePrep(prep: unknown): string {
+  const labels: Record<string, string> = {
+    none: "Minimal",
+    light: "Light",
+    heavy: "Heavy",
+  };
+  return labels[String(prep)] || String(prep);
+}
+
+// Component to display formatted estimate details
+function EstimateDetailsCard({
+  templateType,
+  parameters,
+}: {
+  templateType: string;
+  parameters: Record<string, unknown>;
+}) {
+  const details: Array<{ label: string; value: string }> = [];
+
+  if (templateType === "drywall_hanging") {
+    const sheetsInfo = formatSheets(parameters.sheets);
+    if (sheetsInfo) {
+      details.push({ label: "Materials", value: sheetsInfo });
+    }
+    if (parameters.complexity) {
+      details.push({
+        label: "Complexity",
+        value: formatComplexity(parameters.complexity),
+      });
+    }
+    if (parameters.ceilingFactor && parameters.ceilingFactor !== "standard") {
+      details.push({
+        label: "Ceiling Height",
+        value: formatCeilingFactor(parameters.ceilingFactor),
+      });
+    }
+    if (parameters.wasteFactor) {
+      details.push({
+        label: "Waste Factor",
+        value: `${Math.round(Number(parameters.wasteFactor) * 100)}%`,
+      });
+    }
+  } else if (templateType === "drywall_finishing") {
+    if (parameters.finishLevel) {
+      details.push({
+        label: "Finish Level",
+        value: formatFinishLevel(parameters.finishLevel),
+      });
+    }
+    if (parameters.complexity) {
+      details.push({
+        label: "Complexity",
+        value: formatComplexity(parameters.complexity),
+      });
+    }
+  } else if (templateType === "painting") {
+    if (parameters.coatCount) {
+      details.push({
+        label: "Coats",
+        value: `${parameters.coatCount} coat${
+          Number(parameters.coatCount) !== 1 ? "s" : ""
+        }`,
+      });
+    }
+    if (parameters.paintQuality) {
+      details.push({
+        label: "Paint Quality",
+        value: formatPaintQuality(parameters.paintQuality),
+      });
+    }
+    if (parameters.surfacePrep && parameters.surfacePrep !== "none") {
+      details.push({
+        label: "Surface Prep",
+        value: formatSurfacePrep(parameters.surfacePrep),
+      });
+    }
+    if (parameters.complexity) {
+      details.push({
+        label: "Complexity",
+        value: formatComplexity(parameters.complexity),
+      });
+    }
+    const totalSqft =
+      (Number(parameters.wallSqft) || 0) +
+      (Number(parameters.ceilingSqft) || 0);
+    if (totalSqft > 0) {
+      details.push({
+        label: "Total Area",
+        value: `${totalSqft.toLocaleString()} sq ft`,
+      });
+    }
+  }
+
+  if (details.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="font-semibold text-gray-900 mb-4">Estimate Details</h3>
+      <dl className="grid grid-cols-2 gap-4">
+        {details.map(({ label, value }) => (
+          <div key={label}>
+            <dt className="text-sm text-gray-500">{label}</dt>
+            <dd className="font-medium text-gray-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
 
 const STATUS_CONFIG = {
   draft: {
@@ -67,6 +249,7 @@ const STATUS_CONFIG = {
 interface EstimateDetailContentProps {
   estimate: {
     id: string;
+    name: string | null;
     homeownerName: string;
     homeownerEmail: string;
     homeownerPhone: string | null;
@@ -79,16 +262,21 @@ interface EstimateDetailContentProps {
     expiresAt: string | null;
     projectDescription: string | null;
     parameters: Record<string, unknown> | null;
+    projectId: string | null;
   };
 }
 
-export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) {
+export function EstimateDetailContent({
+  estimate,
+}: EstimateDetailContentProps) {
   const router = useRouter();
   const updateEstimate = useUpdateEstimate();
   const deleteEstimate = useDeleteEstimate();
 
   const effectiveStatus =
-    estimate.status === "sent" && estimate.expiresAt && isExpired(estimate.expiresAt)
+    estimate.status === "sent" &&
+    estimate.expiresAt &&
+    isExpired(estimate.expiresAt)
       ? "expired"
       : estimate.status;
 
@@ -98,8 +286,10 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
   const StatusIcon = statusConfig.icon;
 
   const tradeLabel =
-    TRADE_TYPES.find((t) => t.value === estimate.templateType)?.label ??
-    estimate.templateType;
+    TRADE_LABELS[estimate.templateType] ??
+    estimate.templateType
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
 
   const handleSend = async () => {
     await updateEstimate.mutateAsync({
@@ -133,7 +323,7 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl font-bold text-gray-900">
-                  {estimate.homeownerName}
+                  {estimate.name || estimate.homeownerName}
                 </h1>
                 <span
                   className={cn(
@@ -151,6 +341,16 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
 
             {/* Actions */}
             <div className="flex gap-2">
+              {/* Edit button for draft standalone estimates */}
+              {estimate.status === "draft" && !estimate.projectId && (
+                <Link
+                  href={`/estimates/${estimate.id}/edit`}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-blue-200 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </Link>
+              )}
               {estimate.status === "draft" && (
                 <button
                   onClick={handleSend}
@@ -184,18 +384,31 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Estimate Range */}
+            {/* Estimate Price/Range */}
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                   <DollarSign className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-blue-100 text-sm">Estimated Range</p>
+                  <p className="text-blue-100 text-sm">
+                    {estimate.rangeLow === estimate.rangeHigh
+                      ? "Estimate Total"
+                      : "Estimated Range"}
+                  </p>
                   <p className="text-3xl font-bold">
-                    ${estimate.rangeLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    {" - "}
-                    ${estimate.rangeHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    $
+                    {estimate.rangeLow.toLocaleString(undefined, {
+                      maximumFractionDigits: 0,
+                    })}
+                    {estimate.rangeLow !== estimate.rangeHigh && (
+                      <>
+                        {" - "}$
+                        {estimate.rangeHigh.toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -213,25 +426,12 @@ export function EstimateDetailContent({ estimate }: EstimateDetailContentProps) 
               </div>
             )}
 
-            {/* Parameters */}
-            {estimate.parameters && Object.keys(estimate.parameters).length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">
-                  Project Parameters
-                </h3>
-                <dl className="grid grid-cols-2 gap-4">
-                  {Object.entries(estimate.parameters).map(([key, value]) => (
-                    <div key={key}>
-                      <dt className="text-sm text-gray-500 capitalize">
-                        {key.replace(/_/g, " ")}
-                      </dt>
-                      <dd className="font-medium text-gray-900">
-                        {String(value)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
+            {/* Estimate Details */}
+            {estimate.parameters && (
+              <EstimateDetailsCard
+                templateType={estimate.templateType}
+                parameters={estimate.parameters}
+              />
             )}
           </div>
 

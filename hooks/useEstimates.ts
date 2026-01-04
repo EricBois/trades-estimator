@@ -11,6 +11,7 @@ export interface Estimate {
   contractorId: string;
   templateType: string;
   templateId: string | null;
+  name: string | null;
   homeownerName: string;
   homeownerEmail: string;
   homeownerPhone: string | null;
@@ -22,6 +23,7 @@ export interface Estimate {
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  projectId: string | null;
 }
 
 function toEstimate(e: {
@@ -29,6 +31,7 @@ function toEstimate(e: {
   contractor_id: string;
   template_type: string;
   template_id: string | null;
+  name?: string | null;
   homeowner_name: string;
   homeowner_email: string;
   homeowner_phone: string | null;
@@ -40,12 +43,14 @@ function toEstimate(e: {
   expires_at: string | null;
   created_at: string | null;
   updated_at: string | null;
+  project_id: string | null;
 }): Estimate {
   return {
     id: e.id,
     contractorId: e.contractor_id,
     templateType: e.template_type,
     templateId: e.template_id,
+    name: e.name ?? null,
     homeownerName: e.homeowner_name,
     homeownerEmail: e.homeowner_email,
     homeownerPhone: e.homeowner_phone,
@@ -57,6 +62,7 @@ function toEstimate(e: {
     expiresAt: e.expires_at,
     createdAt: e.created_at ?? new Date().toISOString(),
     updatedAt: e.updated_at ?? new Date().toISOString(),
+    projectId: e.project_id,
   };
 }
 
@@ -102,6 +108,7 @@ export interface CreateEstimateInput {
   contractorId: string;
   templateType: string;
   templateId?: string;
+  name?: string;
   homeownerName: string;
   homeownerEmail: string;
   homeownerPhone?: string;
@@ -124,6 +131,7 @@ export function useCreateEstimate() {
           contractor_id: input.contractorId,
           template_type: input.templateType,
           template_id: input.templateId ?? null,
+          name: input.name ?? null,
           homeowner_name: input.homeownerName,
           homeowner_email: input.homeownerEmail,
           homeowner_phone: input.homeownerPhone ?? null,
@@ -161,6 +169,7 @@ export function useUpdateEstimate() {
       const { data, error } = await supabase
         .from("estimates")
         .update({
+          name: updates.name,
           homeowner_name: updates.homeownerName,
           homeowner_email: updates.homeownerEmail,
           homeowner_phone: updates.homeownerPhone,
