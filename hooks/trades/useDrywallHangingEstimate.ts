@@ -5,9 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   HANGING_ADDONS,
   HANGING_COMPLEXITY_MULTIPLIERS,
+  DRYWALL_SHEET_TYPES,
   getSheetSize,
   getOpeningPreset,
-  getCeilingFactor,
 } from "@/lib/trades/drywallHanging/constants";
 import {
   getUserHangingRates,
@@ -17,6 +17,8 @@ import {
   getSheetLaborCost,
   getUserDefaultWasteFactor,
   getUserLaborPerSqft,
+  getUserCeilingHeightMultiplier,
+  getCeilingMultiplierAppliesTo,
 } from "@/lib/trades/drywallHanging/rates";
 import {
   calculateRoomSqft,
@@ -83,9 +85,11 @@ function createDefaultRoom(
     includeCeiling: false,
     doors: [],
     windows: [],
+    grossWallSqft: 0,
     wallSqft: 0,
     ceilingSqft: 0,
     openingsSqft: 0,
+    grossTotalSqft: 0,
     totalSqft: 0,
   };
 }
@@ -134,9 +138,11 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       const calculated = calculateRoomSqft(room);
       return {
         ...room,
+        grossWallSqft: calculated.grossWallSqft,
         wallSqft: calculated.wallSqft,
         ceilingSqft: calculated.ceilingSqft,
         openingsSqft: calculated.openingsSqft,
+        grossTotalSqft: calculated.grossTotalSqft,
         totalSqft: calculated.totalSqft,
       };
     },
@@ -460,13 +466,14 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
   }, []);
 
   // Calculate sheets from rooms (calculator mode → generates sheet entries)
+  // Uses grossGrandTotalSqft because hanging doesn't deduct for openings
   const calculateSheetsFromRooms = useCallback(() => {
     if (rooms.length === 0) {
       setSheets([]);
       return;
     }
 
-    const { grandTotalSqft } = calculateTotalRoomsSqft(rooms);
+    const { grossGrandTotalSqft } = calculateTotalRoomsSqft(rooms);
 
     // Preserve current selection or use defaults
     setSheets((prevSheets) => {
@@ -480,7 +487,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       if (!sizeInfo) return prevSheets;
 
       const sheetsNeeded = calculateSheetsNeeded(
-        grandTotalSqft,
+        grossGrandTotalSqft,
         size,
         wasteFactor
       );
@@ -817,8 +824,12 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       const totalSqft = directSqft;
 
       // Labor only calculation - no materials, just sqft * rate
-      const ceilingFactorInfo = getCeilingFactor(ceilingFactor);
-      const ceilingMultiplier = ceilingFactorInfo?.multiplier ?? 1;
+      // Use custom ceiling height multiplier from settings
+      const ceilingMultiplier = getUserCeilingHeightMultiplier(
+        ceilingFactor,
+        customRates
+      );
+      // In labor_only mode, we don't have wall/ceiling breakdown, so apply to all
       const laborSubtotal = totalSqft * laborPerSqft * ceilingMultiplier;
 
       // No material cost in labor_only mode
@@ -843,6 +854,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       const total = subtotal + complexityAdjustment;
 
       return {
+        grossTotalSqft: Math.round(totalSqft * 100) / 100, // In labor_only, same as totalSqft
         totalSqft: Math.round(totalSqft * 100) / 100,
         sheetsNeeded: 0, // No sheets in labor_only mode
         materialSubtotal: 0,
@@ -858,15 +870,28 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     }
 
     // Standard calculation for calculator/direct modes (per_sheet pricing)
-    // Total sqft from rooms or estimated from sheets
+    // For hanging, use grossGrandTotalSqft (no deductions for openings)
     const roomTotals = calculateTotalRoomsSqft(rooms);
+
+    // Calculate sqft from rooms or sheets
+    const roomGrossSqft = roomTotals.grossGrandTotalSqft;
+    const sheetsSqft = sheets.reduce((sum, s) => {
+      const sizeInfo = getSheetSize(s.size);
+      return sum + (sizeInfo?.sqft ?? 0) * s.quantity;
+    }, 0);
+
+    // Use room sqft if in calculator mode AND rooms exist, otherwise use sheets
+    // This handles project wizard which uses setSqft to populate sheets
+    const grossTotalSqft =
+      inputMode === "calculator" && rooms.length > 0
+        ? roomGrossSqft
+        : sheetsSqft;
+
+    // Net sqft (with openings deducted) - for reference
     const totalSqft =
-      inputMode === "calculator"
+      inputMode === "calculator" && rooms.length > 0
         ? roomTotals.grandTotalSqft
-        : sheets.reduce((sum, s) => {
-            const sizeInfo = getSheetSize(s.size);
-            return sum + (sizeInfo?.sqft ?? 0) * s.quantity;
-          }, 0);
+        : grossTotalSqft;
 
     // Total sheets
     const sheetsNeeded = sheets.reduce((sum, s) => sum + s.quantity, 0);
@@ -878,14 +903,60 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       return sum + effectiveCost * s.quantity;
     }, 0);
 
-    // Labor subtotal (apply ceiling factor, respect overrides)
-    const ceilingFactorInfo = getCeilingFactor(ceilingFactor);
-    const ceilingMultiplier = ceilingFactorInfo?.multiplier ?? 1;
-    const laborSubtotal =
-      sheets.reduce((sum, s) => {
-        const effectiveCost = s.laborCostOverride ?? s.laborCost;
-        return sum + effectiveCost * s.quantity;
-      }, 0) * ceilingMultiplier;
+    // Labor subtotal - based on sqft, NOT sheet quantities
+    // But still applies sheet type labor multipliers (fire-rated costs more to install)
+    // Use custom ceiling height multiplier from settings
+    const ceilingMultiplier = getUserCeilingHeightMultiplier(
+      ceilingFactor,
+      customRates
+    );
+    const ceilingMultiplierAppliesTo =
+      getCeilingMultiplierAppliesTo(customRates);
+
+    // Calculate weighted labor multiplier from selected sheet types
+    // If no sheets, default multiplier = 1 (standard drywall)
+    let sheetTypeMultiplier = 1;
+    if (sheets.length > 0) {
+      const totalSheetQty = sheets.reduce((sum, s) => sum + s.quantity, 0);
+      if (totalSheetQty > 0) {
+        const weightedMultiplier =
+          sheets.reduce((sum, s) => {
+            const typeInfo = DRYWALL_SHEET_TYPES.find((t) => t.id === s.typeId);
+            return sum + (typeInfo?.laborMultiplier ?? 1) * s.quantity;
+          }, 0) / totalSheetQty;
+        sheetTypeMultiplier = weightedMultiplier;
+      }
+    }
+
+    // Get wall and ceiling sqft separately for "applies to" logic
+    const grossWallSqft =
+      inputMode === "calculator" && rooms.length > 0
+        ? roomTotals.totalGrossWallSqft
+        : grossTotalSqft; // Can't separate walls/ceiling from sheets
+
+    const ceilingSqft =
+      inputMode === "calculator" && rooms.length > 0
+        ? roomTotals.totalCeilingSqft
+        : 0; // Can't separate from sheets
+
+    // Labor calculation based on what the ceiling multiplier applies to
+    let laborSubtotal: number;
+    const baseRate = laborPerSqft * sheetTypeMultiplier;
+
+    if (ceilingMultiplierAppliesTo === "all") {
+      // Apply multiplier to all sqft (walls + ceiling)
+      laborSubtotal = grossTotalSqft * baseRate * ceilingMultiplier;
+    } else if (ceilingMultiplierAppliesTo === "ceiling_only") {
+      // Only apply multiplier to ceiling sqft
+      const wallLabor = grossWallSqft * baseRate;
+      const ceilingLabor = ceilingSqft * baseRate * ceilingMultiplier;
+      laborSubtotal = wallLabor + ceilingLabor;
+    } else {
+      // walls_only - apply multiplier to wall sqft (working higher on walls)
+      const wallLabor = grossWallSqft * baseRate * ceilingMultiplier;
+      const ceilingLabor = ceilingSqft * baseRate;
+      laborSubtotal = wallLabor + ceilingLabor;
+    }
 
     // Addons subtotal (including custom addons)
     const predefinedAddonsTotal = addons.reduce((sum, a) => sum + a.total, 0);
@@ -907,6 +978,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     const costPerSheet = sheetsNeeded > 0 ? total / sheetsNeeded : 0;
 
     return {
+      grossTotalSqft: Math.round(grossTotalSqft * 100) / 100,
       totalSqft: Math.round(totalSqft * 100) / 100,
       sheetsNeeded,
       materialSubtotal: Math.round(materialSubtotal * 100) / 100,

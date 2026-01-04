@@ -130,11 +130,14 @@ function calculateRectangularWalls(
 
 /**
  * Calculate room square footage (walls + optional ceiling - openings)
+ * Returns both gross (before openings) and net (after openings) values
  */
 export function calculateRoomSqft(room: HangingRoom): {
+  grossWallSqft: number;
   wallSqft: number;
   ceilingSqft: number;
   openingsSqft: number;
+  grossTotalSqft: number;
   totalSqft: number;
 } {
   let wallArea = 0;
@@ -198,9 +201,11 @@ export function calculateRoomSqft(room: HangingRoom): {
   const netWallArea = Math.max(0, wallArea - openingsSqft);
 
   return {
+    grossWallSqft: Math.round(wallArea * 100) / 100,
     wallSqft: Math.round(netWallArea * 100) / 100,
     ceilingSqft: Math.round(ceilingArea * 100) / 100,
     openingsSqft: Math.round(openingsSqft * 100) / 100,
+    grossTotalSqft: Math.round((wallArea + ceilingArea) * 100) / 100,
     totalSqft: Math.round((netWallArea + ceilingArea) * 100) / 100,
   };
 }
@@ -222,28 +227,36 @@ export function calculateSheetsNeeded(
 
 /**
  * Calculate total square footage from all rooms
+ * Returns both gross (before openings) and net (after openings) totals
  */
 export function calculateTotalRoomsSqft(rooms: HangingRoom[]): {
+  totalGrossWallSqft: number;
   totalWallSqft: number;
   totalCeilingSqft: number;
   totalOpeningsSqft: number;
+  grossGrandTotalSqft: number;
   grandTotalSqft: number;
 } {
+  let totalGrossWallSqft = 0;
   let totalWallSqft = 0;
   let totalCeilingSqft = 0;
   let totalOpeningsSqft = 0;
 
   for (const room of rooms) {
     const calculated = calculateRoomSqft(room);
+    totalGrossWallSqft += calculated.grossWallSqft;
     totalWallSqft += calculated.wallSqft;
     totalCeilingSqft += calculated.ceilingSqft;
     totalOpeningsSqft += calculated.openingsSqft;
   }
 
   return {
+    totalGrossWallSqft: Math.round(totalGrossWallSqft * 100) / 100,
     totalWallSqft: Math.round(totalWallSqft * 100) / 100,
     totalCeilingSqft: Math.round(totalCeilingSqft * 100) / 100,
     totalOpeningsSqft: Math.round(totalOpeningsSqft * 100) / 100,
+    grossGrandTotalSqft:
+      Math.round((totalGrossWallSqft + totalCeilingSqft) * 100) / 100,
     grandTotalSqft: Math.round((totalWallSqft + totalCeilingSqft) * 100) / 100,
   };
 }

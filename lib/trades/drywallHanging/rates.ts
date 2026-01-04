@@ -4,14 +4,16 @@ import {
   getSheetType,
   HANGING_COMPLEXITY_MULTIPLIERS,
   DRYWALL_SHEET_SIZES,
+  getCeilingFactor,
 } from "./constants";
 import {
   CustomRates,
   DrywallHangingRates,
   DrywallHangingAddonPrices,
   TradeComplexity,
+  CeilingMultiplierAppliesTo,
 } from "@/hooks/useProfile";
-import { DrywallSheetTypeId } from "./types";
+import { DrywallSheetTypeId, CeilingHeightFactor } from "./types";
 
 // Rate type keys that can be customized
 export type HangingRateType = keyof typeof HANGING_RATES;
@@ -266,4 +268,46 @@ export function getHangingComplexityMultiplier(
   return (
     userComplexity[complexity] ?? HANGING_COMPLEXITY_MULTIPLIERS[complexity]
   );
+}
+
+/**
+ * Get user's custom ceiling height multiplier or fall back to constant default
+ */
+export function getUserCeilingHeightMultiplier(
+  heightFactor: CeilingHeightFactor,
+  customRates: CustomRates | null | undefined
+): number {
+  const customMultipliers =
+    customRates?.drywall_hanging?.ceiling_height_multipliers;
+  if (customMultipliers) {
+    const customValue = customMultipliers[heightFactor];
+    if (customValue !== undefined && customValue !== null) {
+      return customValue;
+    }
+  }
+  // Fall back to constants
+  return getCeilingFactor(heightFactor)?.multiplier ?? 1;
+}
+
+/**
+ * Get what the ceiling height multiplier applies to (all, ceiling_only, walls_only)
+ */
+export function getCeilingMultiplierAppliesTo(
+  customRates: CustomRates | null | undefined
+): CeilingMultiplierAppliesTo {
+  return customRates?.drywall_hanging?.ceiling_multiplier_applies_to ?? "all";
+}
+
+/**
+ * Get all ceiling height multipliers with fallbacks to defaults
+ */
+export function getUserCeilingHeightMultipliers(
+  customRates: CustomRates | null | undefined
+): Record<CeilingHeightFactor, number> {
+  return {
+    standard: getUserCeilingHeightMultiplier("standard", customRates),
+    nine_ft: getUserCeilingHeightMultiplier("nine_ft", customRates),
+    ten_ft: getUserCeilingHeightMultiplier("ten_ft", customRates),
+    cathedral: getUserCeilingHeightMultiplier("cathedral", customRates),
+  };
 }

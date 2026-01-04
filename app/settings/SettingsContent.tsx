@@ -164,6 +164,18 @@ export function SettingsContent({ profile }: SettingsContentProps) {
     hangingComplexityComplex:
       existingHangingComplexity?.complex ?? DEFAULT_COMPLEXITY.complex,
 
+    // Drywall Hanging ceiling height multipliers
+    hangingCeilingStandardMultiplier:
+      existingHangingRates?.ceiling_height_multipliers?.standard ?? 1.0,
+    hangingCeilingNineFtMultiplier:
+      existingHangingRates?.ceiling_height_multipliers?.nine_ft ?? 1.1,
+    hangingCeilingTenFtMultiplier:
+      existingHangingRates?.ceiling_height_multipliers?.ten_ft ?? 1.15,
+    hangingCeilingCathedralMultiplier:
+      existingHangingRates?.ceiling_height_multipliers?.cathedral ?? 1.35,
+    hangingCeilingMultiplierAppliesTo:
+      existingHangingRates?.ceiling_multiplier_applies_to ?? "all",
+
     // Painting rates
     paintingLaborPerSqft:
       existingPaintingRates?.labor_per_sqft ??
@@ -279,6 +291,13 @@ export function SettingsContent({ profile }: SettingsContentProps) {
         labor_per_sqft: data.hangingLaborPerSqft,
         material_markup: data.hangingMaterialMarkup,
         default_waste_factor: data.hangingDefaultWaste,
+        ceiling_height_multipliers: {
+          standard: data.hangingCeilingStandardMultiplier,
+          nine_ft: data.hangingCeilingNineFtMultiplier,
+          ten_ft: data.hangingCeilingTenFtMultiplier,
+          cathedral: data.hangingCeilingCathedralMultiplier,
+        },
+        ceiling_multiplier_applies_to: data.hangingCeilingMultiplierAppliesTo,
       },
       drywall_hanging_addons: {
         delivery: data.hangingDelivery,

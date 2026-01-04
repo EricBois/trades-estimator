@@ -23,11 +23,24 @@ export interface DrywallAddonPrices {
   dust_barrier?: number; // flat
 }
 
+// Ceiling height multiplier settings
+export interface CeilingHeightMultipliers {
+  standard?: number; // default 1.0 (8' ceilings)
+  nine_ft?: number; // default 1.1
+  ten_ft?: number; // default 1.15
+  cathedral?: number; // default 1.35
+}
+
+// What the ceiling height multiplier applies to
+export type CeilingMultiplierAppliesTo = "all" | "ceiling_only" | "walls_only";
+
 // Drywall hanging (installation) rates
 export interface DrywallHangingRates {
   labor_per_sqft?: number; // $/sqft
   material_markup?: number; // percentage (0-100)
   default_waste_factor?: number; // decimal (0.10 = 10%)
+  ceiling_height_multipliers?: CeilingHeightMultipliers;
+  ceiling_multiplier_applies_to?: CeilingMultiplierAppliesTo;
 }
 
 // Drywall hanging add-on prices

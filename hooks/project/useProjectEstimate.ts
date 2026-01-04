@@ -157,23 +157,25 @@ export function useProjectEstimate(
   );
 
   // Sync square footage to trade hooks when rooms change
+  // Hanging uses gross sqft (no deductions), finishing/painting use net sqft
   const syncSqftToTrades = useCallback(() => {
     // Get sqft from roomsHook (respects input mode - rooms vs manual)
-    const totalSqft = roomsHook.totalSqft;
+    const grossSqft = roomsHook.totalGrossSqft; // For hanging (no openings deducted)
+    const totalSqft = roomsHook.totalSqft; // For finishing (with openings deducted)
     const wallSqft = roomsHook.totalWallSqft;
     const ceilingSqft = roomsHook.totalCeilingSqft;
 
-    // Sync to hanging estimate
+    // Sync to hanging estimate - uses gross sqft (industry standard)
     if (enabledTrades.includes("drywall_hanging")) {
-      hangingEstimate.setSqft(totalSqft);
+      hangingEstimate.setSqft(grossSqft);
     }
 
-    // Sync to finishing estimate
+    // Sync to finishing estimate - uses net sqft (openings deducted)
     if (enabledTrades.includes("drywall_finishing")) {
       finishingEstimate.setSqft(totalSqft);
     }
 
-    // Sync to painting estimate
+    // Sync to painting estimate - uses net sqft (openings deducted)
     if (enabledTrades.includes("painting")) {
       if (roomsHook.inputMode === "rooms" && roomsHook.rooms.length > 0) {
         const paintingViews = getTradeRoomViews("painting");
@@ -186,6 +188,7 @@ export function useProjectEstimate(
     }
   }, [
     enabledTrades,
+    roomsHook.totalGrossSqft,
     roomsHook.totalSqft,
     roomsHook.totalWallSqft,
     roomsHook.totalCeilingSqft,
@@ -201,7 +204,12 @@ export function useProjectEstimate(
   useEffect(() => {
     syncSqftToTrades();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomsHook.totalSqft, roomOverrides, enabledTrades]);
+  }, [
+    roomsHook.totalGrossSqft,
+    roomsHook.totalSqft,
+    roomOverrides,
+    enabledTrades,
+  ]);
 
   // Calculate trade totals
   const tradeTotals = useMemo((): Partial<

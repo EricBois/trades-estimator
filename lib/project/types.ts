@@ -68,9 +68,11 @@ export interface ProjectRoom {
   doors: ProjectOpening[];
   windows: ProjectOpening[];
   // Calculated values
+  grossWallSqft: number;
   wallSqft: number;
   ceilingSqft: number;
   openingsSqft: number;
+  grossTotalSqft: number;
   totalSqft: number;
   sortOrder: number;
 }
@@ -91,8 +93,10 @@ export interface TradeRoomView extends ProjectRoom {
   includeCeiling: boolean;
   includeWalls: boolean;
   excluded: boolean;
+  effectiveGrossWallSqft: number;
   effectiveWallSqft: number;
   effectiveCeilingSqft: number;
+  effectiveGrossTotalSqft: number;
   effectiveTotalSqft: number;
 }
 
@@ -225,9 +229,11 @@ export function createDefaultRoom(
     customCeilingSqft: undefined,
     doors: [],
     windows: [],
+    grossWallSqft: 0,
     wallSqft: 0,
     ceilingSqft: 0,
     openingsSqft: 0,
+    grossTotalSqft: 0,
     totalSqft: 0,
     sortOrder,
   };
@@ -244,9 +250,12 @@ export function createTradeRoomView(
   const includeWalls = override?.includeWalls ?? true;
   const excluded = override?.excluded ?? false;
 
+  const effectiveGrossWallSqft =
+    excluded || !includeWalls ? 0 : room.grossWallSqft;
   const effectiveWallSqft = excluded || !includeWalls ? 0 : room.wallSqft;
   const effectiveCeilingSqft =
     excluded || !includeCeiling ? 0 : room.ceilingSqft;
+  const effectiveGrossTotalSqft = effectiveGrossWallSqft + effectiveCeilingSqft;
   const effectiveTotalSqft = effectiveWallSqft + effectiveCeilingSqft;
 
   return {
@@ -255,8 +264,10 @@ export function createTradeRoomView(
     includeCeiling,
     includeWalls,
     excluded,
+    effectiveGrossWallSqft,
     effectiveWallSqft,
     effectiveCeilingSqft,
+    effectiveGrossTotalSqft,
     effectiveTotalSqft,
   };
 }

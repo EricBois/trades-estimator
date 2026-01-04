@@ -70,6 +70,15 @@ export const settingsSchema = z.object({
   ),
   hangingComplexityComplex: positiveNumber.default(DEFAULT_COMPLEXITY.complex),
 
+  // Drywall Hanging Ceiling Height Multipliers
+  hangingCeilingStandardMultiplier: positiveNumber.default(1.0),
+  hangingCeilingNineFtMultiplier: positiveNumber.default(1.1),
+  hangingCeilingTenFtMultiplier: positiveNumber.default(1.15),
+  hangingCeilingCathedralMultiplier: positiveNumber.default(1.35),
+  hangingCeilingMultiplierAppliesTo: z
+    .enum(["all", "ceiling_only", "walls_only"])
+    .default("all"),
+
   // Painting Rates
   paintingLaborPerSqft: positiveNumber.default(
     PAINTING_RATES.labor_per_sqft.mid

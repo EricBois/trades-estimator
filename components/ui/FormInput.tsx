@@ -128,9 +128,10 @@ export function SettingsInput({
 interface SettingsSelectProps {
   name: string;
   label: string;
-  options: Array<{ value: number; label: string }>;
+  options: Array<{ value: number | string; label: string }>;
   hint?: string;
   className?: string;
+  valueAsNumber?: boolean;
 }
 
 export function SettingsSelect({
@@ -139,6 +140,7 @@ export function SettingsSelect({
   options,
   hint,
   className,
+  valueAsNumber = true,
 }: SettingsSelectProps) {
   const {
     register,
@@ -156,7 +158,7 @@ export function SettingsSelect({
         {label}
       </label>
       <select
-        {...register(name, { valueAsNumber: true })}
+        {...register(name, { valueAsNumber })}
         id={name}
         className={cn(
           "block w-full px-4 py-3 border rounded-lg shadow-sm transition-shadow bg-white",

@@ -65,7 +65,7 @@ function RoomCard({
               className="font-medium text-gray-900 bg-transparent border-none p-0 focus:outline-none focus:ring-0"
             />
             <div className="text-sm text-gray-500">
-              {room.totalSqft.toFixed(0)} sqft
+              {room.grossTotalSqft.toFixed(0)} sqft
             </div>
           </div>
         </div>
@@ -126,15 +126,15 @@ function RoomCard({
             )}
           </label>
 
-          {/* Openings */}
+          {/* Openings - tracked for finishing/painting (not deducted from hanging) */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">
                 Openings
               </span>
               {room.openingsSqft > 0 && (
-                <span className="text-sm text-gray-500">
-                  -{room.openingsSqft.toFixed(0)} sqft
+                <span className="text-xs text-gray-400">
+                  for finishing/painting
                 </span>
               )}
             </div>
@@ -159,8 +159,8 @@ function RoomCard({
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">
-                        -{door.totalSqft.toFixed(0)} sqft
+                      <span className="text-xs text-gray-400">
+                        {door.totalSqft.toFixed(0)} sqft
                       </span>
                       <button
                         onClick={() => onRemoveOpening(door.id)}
@@ -188,8 +188,8 @@ function RoomCard({
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">
-                        -{window.totalSqft.toFixed(0)} sqft
+                      <span className="text-xs text-gray-400">
+                        {window.totalSqft.toFixed(0)} sqft
                       </span>
                       <button
                         onClick={() => onRemoveOpening(window.id)}
@@ -222,12 +222,12 @@ function RoomCard({
             </div>
           </div>
 
-          {/* Summary */}
+          {/* Summary - shows gross sqft (no deductions for hanging) */}
           <div className="pt-3 border-t border-gray-200">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Walls</span>
               <span className="text-gray-700">
-                {room.wallSqft.toFixed(0)} sqft
+                {room.grossWallSqft.toFixed(0)} sqft
               </span>
             </div>
             {room.includeCeiling && (
@@ -241,7 +241,7 @@ function RoomCard({
             <div className="flex justify-between text-sm font-medium mt-1 pt-1 border-t border-gray-100">
               <span className="text-gray-700">Total</span>
               <span className="text-blue-600">
-                {room.totalSqft.toFixed(0)} sqft
+                {room.grossTotalSqft.toFixed(0)} sqft
               </span>
             </div>
           </div>
@@ -275,7 +275,8 @@ export function HangingRoomStep() {
     type: "doors" | "windows";
   }>({ isOpen: false, roomId: "", type: "doors" });
 
-  const totalSqft = rooms.reduce((sum, room) => sum + room.totalSqft, 0);
+  // Use gross sqft for hanging (no deductions for openings)
+  const totalSqft = rooms.reduce((sum, room) => sum + room.grossTotalSqft, 0);
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);

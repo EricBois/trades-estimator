@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useWizard } from "react-use-wizard";
 import {
   Square,
@@ -31,6 +31,7 @@ import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { SelectionPillGroup } from "@/components/ui/SelectionPill";
 import { CostSummary } from "@/components/ui/CostSummary";
 import { MaterialToggle } from "@/components/ui/MaterialToggle";
+import { LaborEditSheet } from "./LaborEditSheet";
 
 // Icon mapping
 const ICONS: Record<string, React.ElementType> = {
@@ -72,16 +73,31 @@ export function HangingSheetTypeStep({
     totals,
     clientSuppliesMaterials,
     setClientSuppliesMaterials,
+    setSheetLaborCostOverride,
   } = estimate;
 
-  // Calculate sheets from rooms on first load if no sheets exist
+  // State for labor edit sheet
+  const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
+  const editingSheet = editingSheetId
+    ? sheets.find((s) => s.id === editingSheetId)
+    : null;
+  const editingSheetType = editingSheet
+    ? DRYWALL_SHEET_TYPES.find((t) => t.id === editingSheet.typeId)
+    : null;
+
+  // Track if we've done initial sheet calculation
+  const hasInitialized = useRef(false);
+
+  // Calculate sheets from rooms only on first load (not when user deletes sheets)
   useEffect(() => {
-    if (sheets.length === 0 && rooms.length > 0) {
+    if (!hasInitialized.current && sheets.length === 0 && rooms.length > 0) {
       calculateSheetsFromRooms();
+      hasInitialized.current = true;
     }
   }, [sheets.length, rooms.length, calculateSheetsFromRooms]);
 
-  const hasSelection = sheets.length > 0 && totals.sheetsNeeded > 0;
+  // Allow continuing if we have sqft (from rooms OR sheets via project wizard)
+  const hasSelection = totals.grossTotalSqft > 0;
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);
@@ -95,7 +111,9 @@ export function HangingSheetTypeStep({
     return () => setFooterConfig(null);
   }, [setFooterConfig, handleContinue, hasSelection]);
 
-  const totalSqft = rooms.reduce((sum, room) => sum + room.totalSqft, 0);
+  // Use gross sqft for hanging (no deductions for openings - industry standard)
+  // Use totals from hook which handles all input modes correctly
+  const totalSqft = totals.grossTotalSqft;
   const currentSize: DrywallSheetSize = sheets[0]?.size ?? "4x8";
   const sizeInfo = DRYWALL_SHEET_SIZES.find((s) => s.value === currentSize);
   const sqftPerSheet = sizeInfo?.sqft ?? 32;
@@ -151,9 +169,9 @@ export function HangingSheetTypeStep({
     <div className="w-full max-w-2xl mx-auto px-4">
       <StepHeader
         title="Sheet Type & Size"
-        description={`Select drywall types for ${totalSqft.toFixed(
+        description={`${totalSqft.toFixed(
           0
-        )} sqft - tap to add, set quantities`}
+        )} sqft labor - select sheets for material list (optional)`}
       />
 
       {/* Global Materials Toggle */}
@@ -236,7 +254,7 @@ export function HangingSheetTypeStep({
 
                 {/* Quantity controls - shown when selected */}
                 {isSelected && sheet && (
-                  <div className="border-t border-blue-200 bg-blue-50/50 px-3 py-2">
+                  <div className="border-t border-blue-200 bg-blue-50/50 px-3 py-2 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-blue-700">Quantity</span>
                       <QuantityStepper
@@ -250,6 +268,28 @@ export function HangingSheetTypeStep({
                         min={0}
                         size="md"
                       />
+                    </div>
+                    {/* Tap to edit labor rate */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-blue-700">Labor/sheet</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSheetId(sheet.id);
+                        }}
+                        className={cn(
+                          "text-sm font-medium px-2 py-1 rounded-lg transition-colors",
+                          sheet.laborCostOverride !== undefined
+                            ? "text-orange-600 bg-orange-50 hover:bg-orange-100"
+                            : "text-blue-600 bg-blue-100 hover:bg-blue-200"
+                        )}
+                      >
+                        $
+                        {(sheet.laborCostOverride ?? sheet.laborCost).toFixed(
+                          2
+                        )}
+                        {sheet.laborCostOverride !== undefined && " ✎"}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -316,6 +356,23 @@ export function HangingSheetTypeStep({
           total={{ label: "Total", value: totals.subtotal }}
         />
       )}
+
+      {/* Labor Edit Sheet */}
+      <LaborEditSheet
+        isOpen={editingSheetId !== null}
+        onClose={() => setEditingSheetId(null)}
+        sheetTypeName={editingSheetType?.label ?? ""}
+        currentLabor={
+          editingSheet?.laborCostOverride ?? editingSheet?.laborCost ?? 0
+        }
+        defaultLabor={editingSheet?.laborCost ?? 0}
+        laborOverride={editingSheet?.laborCostOverride}
+        onSave={(override) => {
+          if (editingSheetId) {
+            setSheetLaborCostOverride(editingSheetId, override);
+          }
+        }}
+      />
     </div>
   );
 }

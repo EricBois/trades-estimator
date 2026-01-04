@@ -1,6 +1,6 @@
 "use client";
 
-import { Hammer, DollarSign } from "lucide-react";
+import { Hammer, DollarSign, Ruler } from "lucide-react";
 import { SettingsInput, SettingsSelect } from "@/components/ui/FormInput";
 import { SettingsSection } from "@/components/ui/SettingsSection";
 import { ComplexitySection } from "@/components/settings/shared";
@@ -10,6 +10,7 @@ import {
   HANGING_RATES,
   WASTE_FACTORS,
   HANGING_ADDONS,
+  CEILING_HEIGHT_FACTORS,
 } from "@/lib/trades/drywallHanging/constants";
 
 export function DrywallHangingSettings() {
@@ -114,6 +115,70 @@ export function DrywallHangingSettings() {
 
       {/* Complexity */}
       <ComplexitySection prefix="hanging" />
+
+      {/* Ceiling Height Multipliers */}
+      <SettingsSection
+        icon={Ruler}
+        title="Ceiling Height Multipliers"
+        description="Adjust labor rates for different ceiling heights"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <SettingsInput
+            name="hangingCeilingStandardMultiplier"
+            label={CEILING_HEIGHT_FACTORS[0].label}
+            unit="×"
+            step={0.05}
+            placeholder="1.0"
+            hint="Base rate (1.0 = no adjustment)"
+          />
+          <SettingsInput
+            name="hangingCeilingNineFtMultiplier"
+            label={CEILING_HEIGHT_FACTORS[1].label}
+            unit="×"
+            step={0.05}
+            placeholder="1.1"
+            hint={`Default: ${CEILING_HEIGHT_FACTORS[1].multiplier}× (${(
+              (CEILING_HEIGHT_FACTORS[1].multiplier - 1) *
+              100
+            ).toFixed(0)}% more)`}
+          />
+          <SettingsInput
+            name="hangingCeilingTenFtMultiplier"
+            label={CEILING_HEIGHT_FACTORS[2].label}
+            unit="×"
+            step={0.05}
+            placeholder="1.15"
+            hint={`Default: ${CEILING_HEIGHT_FACTORS[2].multiplier}× (${(
+              (CEILING_HEIGHT_FACTORS[2].multiplier - 1) *
+              100
+            ).toFixed(0)}% more)`}
+          />
+          <SettingsInput
+            name="hangingCeilingCathedralMultiplier"
+            label={CEILING_HEIGHT_FACTORS[3].label}
+            unit="×"
+            step={0.05}
+            placeholder="1.35"
+            hint={`Default: ${CEILING_HEIGHT_FACTORS[3].multiplier}× (${(
+              (CEILING_HEIGHT_FACTORS[3].multiplier - 1) *
+              100
+            ).toFixed(0)}% more)`}
+          />
+        </div>
+        <div className="mt-4">
+          <SettingsSelect
+            name="hangingCeilingMultiplierAppliesTo"
+            label="Multiplier Applies To"
+            options={[
+              { value: "all", label: "All sqft (walls + ceiling)" },
+              { value: "ceiling_only", label: "Ceiling sqft only" },
+              { value: "walls_only", label: "Wall sqft only" },
+            ]}
+            valueAsNumber={false}
+            hint="Choose what the ceiling height multiplier affects"
+          />
+        </div>
+      </SettingsSection>
 
       {/* Preset Materials */}
       <PresetMaterialPricesSection trade="drywall_hanging" />

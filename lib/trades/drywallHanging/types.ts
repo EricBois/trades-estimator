@@ -92,9 +92,11 @@ export interface HangingRoom {
   doors: HangingOpening[];
   windows: HangingOpening[];
   // Calculated values
+  grossWallSqft: number;
   wallSqft: number;
   ceilingSqft: number;
   openingsSqft: number;
+  grossTotalSqft: number;
   totalSqft: number;
 }
 
@@ -143,6 +145,7 @@ export interface DrywallHangingEstimateData {
 
 // Totals breakdown
 export interface HangingEstimateTotals {
+  grossTotalSqft: number;
   totalSqft: number;
   sheetsNeeded: number;
   materialSubtotal: number;
@@ -230,8 +233,16 @@ export interface DrywallHangingEstimateActions {
   updateAddonQuantity: (addonId: HangingAddonId, quantity: number) => void;
   removeAddon: (addonId: HangingAddonId) => void;
   // Custom addon management
-  addCustomAddon: (name: string, price: number, unit: AddonUnit, quantity?: number) => void;
-  updateCustomAddon: (id: string, updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>) => void;
+  addCustomAddon: (
+    name: string,
+    price: number,
+    unit: AddonUnit,
+    quantity?: number
+  ) => void;
+  updateCustomAddon: (
+    id: string,
+    updates: Partial<Omit<CustomAddon, "id" | "isCustom" | "total">>
+  ) => void;
   removeCustomAddon: (id: string) => void;
   // Material toggle and overrides
   setSheetIncludeMaterial: (id: string, include: boolean) => void;

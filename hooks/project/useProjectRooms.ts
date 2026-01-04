@@ -42,9 +42,13 @@ function toProjectRoom(row: Tables<"project_rooms">): ProjectRoom {
     customCeilingSqft: row.custom_ceiling_sqft ?? undefined,
     doors: (row.doors as unknown as ProjectOpening[]) ?? [],
     windows: (row.windows as unknown as ProjectOpening[]) ?? [],
+    // Gross values (before openings deducted) - calculated from net + openings
+    grossWallSqft: (row.wall_sqft ?? 0) + (row.openings_sqft ?? 0),
     wallSqft: row.wall_sqft ?? 0,
     ceilingSqft: row.ceiling_sqft ?? 0,
     openingsSqft: row.openings_sqft ?? 0,
+    grossTotalSqft:
+      (row.wall_sqft ?? 0) + (row.openings_sqft ?? 0) + (row.ceiling_sqft ?? 0),
     totalSqft: row.total_sqft ?? 0,
     sortOrder: row.sort_order ?? 0,
   };
@@ -122,9 +126,11 @@ export function useProjectRooms(projectId: string) {
     const calculated = calculateRoomSqft(hangingRoom);
     return {
       ...room,
+      grossWallSqft: calculated.grossWallSqft,
       wallSqft: calculated.wallSqft,
       ceilingSqft: calculated.ceilingSqft,
       openingsSqft: calculated.openingsSqft,
+      grossTotalSqft: calculated.grossTotalSqft,
       totalSqft: calculated.totalSqft,
     };
   }, []);
@@ -441,6 +447,11 @@ export function useProjectRooms(projectId: string) {
   }, []);
 
   // Calculate room-based sqft
+  const roomsGrossWallSqft = useMemo(
+    () => rooms.reduce((sum, room) => sum + room.grossWallSqft, 0),
+    [rooms]
+  );
+
   const roomsWallSqft = useMemo(
     () => rooms.reduce((sum, room) => sum + room.wallSqft, 0),
     [rooms]
@@ -452,6 +463,13 @@ export function useProjectRooms(projectId: string) {
   );
 
   // Effective sqft based on input mode
+  // Gross values (before openings deducted) - used for hanging
+  const totalGrossWallSqft =
+    inputMode === "rooms" ? roomsGrossWallSqft : manualWallSqft;
+  const totalGrossSqft =
+    totalGrossWallSqft +
+    (inputMode === "rooms" ? roomsCeilingSqft : manualCeilingSqft);
+  // Net values (after openings deducted) - used for finishing/painting
   const totalWallSqft = inputMode === "rooms" ? roomsWallSqft : manualWallSqft;
   const totalCeilingSqft =
     inputMode === "rooms" ? roomsCeilingSqft : manualCeilingSqft;
@@ -460,6 +478,10 @@ export function useProjectRooms(projectId: string) {
   return {
     // Data
     rooms,
+    // Gross sqft (before openings deducted) - for hanging
+    totalGrossSqft,
+    totalGrossWallSqft,
+    // Net sqft (after openings deducted) - for finishing/painting
     totalSqft,
     totalWallSqft,
     totalCeilingSqft,

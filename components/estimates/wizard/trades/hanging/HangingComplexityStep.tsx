@@ -60,8 +60,20 @@ export function HangingComplexityStep({
     );
   }
 
-  const { complexity, setComplexity, ceilingFactor, setCeilingFactor, totals } =
-    estimate;
+  const {
+    complexity,
+    setComplexity,
+    ceilingFactor,
+    setCeilingFactor,
+    totals,
+    rooms,
+  } = estimate;
+
+  // Check if any rooms include ceiling work
+  // If rooms exist and none include ceilings, hide ceiling height section
+  // If no rooms (project wizard), show it by default
+  const hasCeilingWork =
+    rooms.length === 0 || rooms.some((room) => room.includeCeiling);
 
   // Configure footer
   const handleContinue = useCallback(() => nextStep(), [nextStep]);
@@ -91,46 +103,50 @@ export function HangingComplexityStep({
         Select the job difficulty level
       </p>
 
-      {/* Ceiling Height Factor */}
-      <div className="mb-6">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">
-          Ceiling Height
-        </h3>
-        <div className="grid grid-cols-2 gap-2">
-          {CEILING_HEIGHT_FACTORS.map((factor) => {
-            const isSelected = ceilingFactor === factor.value;
+      {/* Ceiling Height Factor - only show if any room includes ceiling */}
+      {hasCeilingWork && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">
+            Ceiling Height
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {CEILING_HEIGHT_FACTORS.map((factor) => {
+              const isSelected = ceilingFactor === factor.value;
 
-            return (
-              <button
-                key={factor.value}
-                onClick={() =>
-                  handleCeilingFactorSelect(factor.value as CeilingHeightFactor)
-                }
-                className={cn(
-                  "py-3 px-4 rounded-xl border-2 transition-all text-left",
-                  isSelected
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                )}
-              >
-                <div
+              return (
+                <button
+                  key={factor.value}
+                  onClick={() =>
+                    handleCeilingFactorSelect(
+                      factor.value as CeilingHeightFactor
+                    )
+                  }
                   className={cn(
-                    "font-medium",
-                    isSelected ? "text-blue-900" : "text-gray-900"
+                    "py-3 px-4 rounded-xl border-2 transition-all text-left",
+                    isSelected
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
                   )}
                 >
-                  {factor.label}
-                </div>
-                {factor.multiplier !== 1 && (
-                  <div className="text-xs text-gray-500">
-                    +{((factor.multiplier - 1) * 100).toFixed(0)}% labor
+                  <div
+                    className={cn(
+                      "font-medium",
+                      isSelected ? "text-blue-900" : "text-gray-900"
+                    )}
+                  >
+                    {factor.label}
                   </div>
-                )}
-              </button>
-            );
-          })}
+                  {factor.multiplier !== 1 && (
+                    <div className="text-xs text-gray-500">
+                      +{((factor.multiplier - 1) * 100).toFixed(0)}% labor
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Overall Complexity */}
       <div className="mb-6">
