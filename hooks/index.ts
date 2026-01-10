@@ -72,3 +72,6 @@ export type {
   UpdateMaterialInput,
   MaterialCategory,
 } from "./useContractorMaterials";
+
+// Email hooks
+export { useSendEstimateEmail } from "./useSendEstimateEmail";

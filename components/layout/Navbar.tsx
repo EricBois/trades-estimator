@@ -9,6 +9,7 @@ import {
   FilePlus,
   FileText,
   FileStack,
+  Users,
   Menu,
   X,
   LogOut,
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/clients", label: "Clients", icon: Users },
   { href: "/estimates/new", label: "New Estimate", icon: FilePlus },
   { href: "/estimates", label: "Estimates", icon: FileText },
   { href: "/templates", label: "Templates", icon: FileStack },

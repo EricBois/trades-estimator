@@ -70,6 +70,7 @@ export function HangingSheetTypeStep({
     updateSheet,
     removeSheet,
     calculateSheetsFromRooms,
+    regenerateSheets,
     totals,
     clientSuppliesMaterials,
     setClientSuppliesMaterials,
@@ -162,13 +163,8 @@ export function HangingSheetTypeStep({
     if (existingSheet) {
       removeSheet(existingSheet.id);
     } else {
-      if (sheets.length === 0) {
-        addSheet(typeId, currentSize, totalSheetsNeeded);
-      } else if (remainingSheets > 0) {
-        addSheet(typeId, currentSize, remainingSheets);
-      } else {
-        addSheet(typeId, currentSize, 0);
-      }
+      // Always add with 0 quantity - user can use "Allocate" button to fill
+      addSheet(typeId, currentSize, 0);
     }
   };
 
@@ -179,23 +175,39 @@ export function HangingSheetTypeStep({
     const sheet = sheets.find((s) => s.typeId === typeId);
     if (!sheet) return;
 
-    const delta = newValue - sheet.quantity;
     updateSheet(sheet.id, { quantity: newValue });
-
-    // If exactly 2 types selected, auto-adjust the other one
-    if (sheets.length === 2) {
-      const otherSheet = sheets.find((s) => s.typeId !== typeId);
-      if (otherSheet) {
-        const otherNewQty = Math.max(0, otherSheet.quantity - delta);
-        updateSheet(otherSheet.id, { quantity: otherNewQty });
-      }
-    }
   };
 
   const handleSizeSelect = (size: DrywallSheetSize) => {
-    sheets.forEach((sheet) => {
-      updateSheet(sheet.id, { size });
-    });
+    const newSizeInfo = DRYWALL_SHEET_SIZES.find((s) => s.value === size);
+    if (!newSizeInfo || totalSqft <= 0) {
+      // Just update size if no sqft available
+      sheets.forEach((sheet) => updateSheet(sheet.id, { size }));
+      return;
+    }
+
+    const newSqftPerSheet = newSizeInfo.sqft;
+    const newTotalNeeded = Math.ceil(
+      (totalSqft * (1 + wasteFactor)) / newSqftPerSheet
+    );
+
+    if (sheets.length === 1) {
+      // Single type - update size and quantity
+      updateSheet(sheets[0].id, { size, quantity: newTotalNeeded });
+    } else {
+      // Multiple types - scale proportionally
+      const currentTotal = sheets.reduce((sum, s) => sum + s.quantity, 0);
+      if (currentTotal > 0) {
+        const scale = newTotalNeeded / currentTotal;
+        sheets.forEach((sheet) => {
+          const newQty = Math.round(sheet.quantity * scale);
+          updateSheet(sheet.id, { size, quantity: Math.max(0, newQty) });
+        });
+      } else {
+        // All quantities are 0, just update size
+        sheets.forEach((sheet) => updateSheet(sheet.id, { size }));
+      }
+    }
   };
 
   return (
@@ -263,14 +275,9 @@ export function HangingSheetTypeStep({
                       {type.label}
                     </div>
                     <div className="text-xs text-gray-500">
-                      $
-                      {(
-                        (clientSuppliesMaterials ? 0 : type.materialCost) +
-                        HANGING_RATES.labor_per_sqft.mid *
-                          sqftPerSheet *
-                          type.laborMultiplier
-                      ).toFixed(0)}
-                      /sheet{clientSuppliesMaterials && " (labor)"}
+                      {clientSuppliesMaterials
+                        ? "Labor only"
+                        : `$${type.materialCost}/sheet`}
                     </div>
                   </div>
                   {isSelected && sheet && (
@@ -324,6 +331,18 @@ export function HangingSheetTypeStep({
                         {sheet.laborCostOverride !== undefined && " ✎"}
                       </button>
                     </div>
+                    {/* Allocate remaining sheets button */}
+                    {remainingSheets > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          regenerateSheets(type.id as DrywallSheetTypeId);
+                        }}
+                        className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-colors"
+                      >
+                        + Allocate {remainingSheets} sheets
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

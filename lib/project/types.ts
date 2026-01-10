@@ -125,6 +125,7 @@ export type ProjectStatus =
 export interface Project {
   id: string;
   contractorId: string;
+  clientId: string | null;
   name: string;
   homeownerName: string;
   homeownerEmail: string;

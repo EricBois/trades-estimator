@@ -14,6 +14,59 @@ export type Database = {
   };
   public: {
     Tables: {
+      clients: {
+        Row: {
+          id: string;
+          contractor_id: string;
+          name: string;
+          email: string | null;
+          phone: string | null;
+          street: string | null;
+          city: string | null;
+          state: string | null;
+          zip: string | null;
+          notes: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          contractor_id: string;
+          name: string;
+          email?: string | null;
+          phone?: string | null;
+          street?: string | null;
+          city?: string | null;
+          state?: string | null;
+          zip?: string | null;
+          notes?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          contractor_id?: string;
+          name?: string;
+          email?: string | null;
+          phone?: string | null;
+          street?: string | null;
+          city?: string | null;
+          state?: string | null;
+          zip?: string | null;
+          notes?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "clients_contractor_id_fkey";
+            columns: ["contractor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       estimate_photos: {
         Row: {
           created_at: string | null;
@@ -98,6 +151,7 @@ export type Database = {
       };
       estimates: {
         Row: {
+          client_id: string | null;
           contractor_id: string;
           created_at: string | null;
           expires_at: string | null;
@@ -105,6 +159,7 @@ export type Database = {
           homeowner_name: string;
           homeowner_phone: string | null;
           id: string;
+          name: string | null;
           parameters: Json | null;
           project_description: string | null;
           project_id: string | null;
@@ -118,6 +173,7 @@ export type Database = {
           viewed_at: string | null;
         };
         Insert: {
+          client_id?: string | null;
           contractor_id?: string;
           created_at?: string | null;
           expires_at?: string | null;
@@ -125,6 +181,7 @@ export type Database = {
           homeowner_name: string;
           homeowner_phone?: string | null;
           id?: string;
+          name?: string | null;
           parameters?: Json | null;
           project_description?: string | null;
           project_id?: string | null;
@@ -138,6 +195,7 @@ export type Database = {
           viewed_at?: string | null;
         };
         Update: {
+          client_id?: string | null;
           contractor_id?: string;
           created_at?: string | null;
           expires_at?: string | null;
@@ -145,6 +203,7 @@ export type Database = {
           homeowner_name?: string;
           homeowner_phone?: string | null;
           id?: string;
+          name?: string | null;
           parameters?: Json | null;
           project_description?: string | null;
           project_id?: string | null;
@@ -158,6 +217,13 @@ export type Database = {
           viewed_at?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "estimates_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "estimates_contractor_id_fkey";
             columns: ["contractor_id"];
@@ -189,6 +255,7 @@ export type Database = {
           hidden_template_ids: string[] | null;
           hourly_rate: number | null;
           id: string;
+          logo_url: string | null;
           preferred_trade_types: string[] | null;
           service_areas: string[] | null;
           templates_onboarded: boolean | null;
@@ -202,6 +269,7 @@ export type Database = {
           hidden_template_ids?: string[] | null;
           hourly_rate?: number | null;
           id: string;
+          logo_url?: string | null;
           preferred_trade_types?: string[] | null;
           service_areas?: string[] | null;
           templates_onboarded?: boolean | null;
@@ -215,6 +283,7 @@ export type Database = {
           hidden_template_ids?: string[] | null;
           hourly_rate?: number | null;
           id?: string;
+          logo_url?: string | null;
           preferred_trade_types?: string[] | null;
           service_areas?: string[] | null;
           templates_onboarded?: boolean | null;
@@ -440,6 +509,7 @@ export type Database = {
       };
       projects: {
         Row: {
+          client_id: string | null;
           contractor_id: string;
           created_at: string | null;
           expires_at: string | null;
@@ -456,6 +526,7 @@ export type Database = {
           viewed_at: string | null;
         };
         Insert: {
+          client_id?: string | null;
           contractor_id: string;
           created_at?: string | null;
           expires_at?: string | null;
@@ -472,6 +543,7 @@ export type Database = {
           viewed_at?: string | null;
         };
         Update: {
+          client_id?: string | null;
           contractor_id?: string;
           created_at?: string | null;
           expires_at?: string | null;
@@ -488,6 +560,13 @@ export type Database = {
           viewed_at?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "projects_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "projects_contractor_id_fkey";
             columns: ["contractor_id"];

@@ -11,7 +11,9 @@ import { TemplateStep } from "./TemplateStep";
 import { QuantityStep } from "./QuantityStep";
 import { ComplexityStep } from "./ComplexityStep";
 import { EstimatePreview } from "./EstimatePreview";
+import { PDFPreviewStep } from "./PDFPreviewStep";
 import { SendEstimate } from "./SendEstimate";
+import { ClientStep } from "./ClientStep";
 import { DrywallEstimateWizard } from "./trades/drywall/DrywallEstimateWizard";
 import { HangingEstimateWizard } from "./trades/hanging/HangingEstimateWizard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,10 +21,12 @@ import { useEstimate, useCreateEstimate, useUpdateEstimate } from "@/hooks";
 
 // Step configuration for the stepper
 const WIZARD_STEPS = [
+  { label: "Client" },
   { label: "Template" },
   { label: "Details" },
   { label: "Complexity" },
   { label: "Preview" },
+  { label: "PDF" },
   { label: "Send" },
 ];
 
@@ -150,10 +154,12 @@ function WizardContent({ initialTrade, estimateId }: EstimateWizardProps) {
           footer={<WizardNavigation />}
           wrapper={<StandardWizardWrapper />}
         >
+          <ClientStep />
           <TemplateStep />
           <QuantityStep />
           <ComplexityStep />
           <EstimatePreview />
+          <PDFPreviewStep />
           <SendEstimate />
         </Wizard>
       </WizardOuterLayout>

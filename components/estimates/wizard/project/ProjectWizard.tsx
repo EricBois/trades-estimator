@@ -19,7 +19,9 @@ import { ProjectRoomsStep } from "./ProjectRoomsStep";
 import { TradeRoomSelectionStep } from "./TradeRoomSelectionStep";
 import { TradeHoursStep } from "./TradeHoursStep";
 import { ProjectCombinedPreview } from "./ProjectCombinedPreview";
+import { ProjectPDFPreviewStep } from "./ProjectPDFPreviewStep";
 import { ProjectSendEstimate } from "./ProjectSendEstimate";
+import { ProjectClientStep } from "./ProjectClientStep";
 // Standalone hanging steps
 import { HangingSheetTypeStep } from "../trades/hanging/HangingSheetTypeStep";
 import { HangingComplexityStep } from "../trades/hanging/HangingComplexityStep";
@@ -42,7 +44,7 @@ interface Step {
 }
 
 // Base steps that are always present
-const BASE_STEPS: Step[] = [{ label: "Trades" }, { label: "Rooms" }];
+const BASE_STEPS: Step[] = [{ label: "Client" }, { label: "Trades" }, { label: "Rooms" }];
 
 // Trade-specific step labels (arrays to support multiple steps per trade)
 // Note: "Rooms" step auto-skips in manual mode
@@ -74,7 +76,7 @@ const TRADE_STEP_LABELS: Record<string, Step[]> = {
 };
 
 // Final steps
-const FINAL_STEPS: Step[] = [{ label: "Preview" }, { label: "Send" }];
+const FINAL_STEPS: Step[] = [{ label: "Preview" }, { label: "PDF" }, { label: "Send" }];
 
 // Component to set up global save draft handler
 function SaveDraftHandler() {
@@ -84,6 +86,7 @@ function SaveDraftHandler() {
   const {
     projectId,
     projectName,
+    clientId,
     enabledTrades,
     tradeTotals,
     roomsHook,
@@ -112,6 +115,7 @@ function SaveDraftHandler() {
       await updateProject.mutateAsync({
         id: projectId,
         name: projectName || "Untitled Project",
+        clientId: clientId ?? undefined,
       });
       targetProjectId = projectId;
     } else {
@@ -119,6 +123,7 @@ function SaveDraftHandler() {
       const project = await createProject.mutateAsync({
         contractorId: user.id,
         name: projectName || "Untitled Project",
+        clientId: clientId ?? undefined,
       });
       targetProjectId = project.id;
     }
@@ -178,6 +183,7 @@ function SaveDraftHandler() {
 
       await createEstimate.mutateAsync({
         contractorId: user.id,
+        clientId: clientId ?? undefined,
         templateType: tradeType,
         homeownerName: "",
         homeownerEmail: "",
@@ -195,6 +201,7 @@ function SaveDraftHandler() {
     user,
     isExistingProject,
     projectId,
+    clientId,
     createProject,
     updateProject,
     projectName,
@@ -280,10 +287,13 @@ function ProjectWizardInner() {
           footer={<WizardNavigation />}
           wrapper={<ProjectWizardWrapper steps={steps} />}
         >
-          {/* Step 0: Trade Selection */}
+          {/* Step 0: Client Selection */}
+          <ProjectClientStep />
+
+          {/* Step 1: Trade Selection */}
           <ProjectTradeSelectionStep />
 
-          {/* Step 1: Rooms */}
+          {/* Step 2: Rooms */}
           <ProjectRoomsStep />
 
           {/* Dynamic hanging steps */}
@@ -348,6 +358,7 @@ function ProjectWizardInner() {
 
           {/* Final steps */}
           <ProjectCombinedPreview />
+          <ProjectPDFPreviewStep />
           <ProjectSendEstimate />
         </Wizard>
       </WizardOuterLayout>

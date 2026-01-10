@@ -229,6 +229,8 @@ export interface DrywallHangingEstimateActions {
   setSqft: (totalSqft: number) => void;
   // Set sqft from project wizard trade room views (tracks wall/ceiling separately)
   setFromRooms: (rooms: TradeRoomView[]) => void;
+  // Regenerate sheet quantities based on total sqft (fills in sheets with quantity = 0)
+  regenerateSheets: (targetTypeId?: DrywallSheetTypeId) => void;
   // Settings
   setCeilingFactor: (factor: CeilingHeightFactor) => void;
   setWasteFactor: (factor: number) => void;

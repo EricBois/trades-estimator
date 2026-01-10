@@ -27,11 +27,13 @@ interface WizardData {
   template: Template | null;
   parameters: Record<string, string | number>;
   complexity: string;
+  clientId: string | null;
   estimateName: string;
   homeownerName: string;
   homeownerEmail: string;
   homeownerPhone: string;
   projectDescription: string;
+  pdfDetailLevel: "simple" | "detailed" | "extra_detailed";
 }
 
 interface WizardDataContextValue extends WizardData {
@@ -47,11 +49,13 @@ const initialWizardData: WizardData = {
   template: null,
   parameters: {},
   complexity: "standard",
+  clientId: null,
   estimateName: "",
   homeownerName: "",
   homeownerEmail: "",
   homeownerPhone: "",
   projectDescription: "",
+  pdfDetailLevel: "detailed",
 };
 
 const WizardDataContext = createContext<WizardDataContextValue | null>(null);

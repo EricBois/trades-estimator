@@ -530,6 +530,10 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
         return;
       }
 
+      // Store the sqft for fallback when sheets are removed
+      setProjectGrossWallSqft(totalSqft);
+      setProjectCeilingSqft(0); // No wall/ceiling breakdown in direct mode
+
       // Preserve current selection or use defaults
       setSheets((prevSheets) => {
         const currentSheet = prevSheets[0];
@@ -639,6 +643,89 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
       });
     },
     [wasteFactor, customRates, clientSuppliesMaterials]
+  );
+
+  // Regenerate sheets based on total sqft - fills in quantity for sheets with 0
+  // If targetTypeId is provided, adds remaining to that specific type
+  const regenerateSheets = useCallback(
+    (targetTypeId?: DrywallSheetTypeId) => {
+      // Get total sqft from rooms or project
+      const roomTotals = calculateTotalRoomsSqft(rooms);
+      const roomGrossSqft = roomTotals.grossGrandTotalSqft;
+      const projectSqft = projectGrossWallSqft + projectCeilingSqft;
+
+      const totalSqft =
+        inputMode === "calculator" && rooms.length > 0
+          ? roomGrossSqft
+          : projectSqft > 0
+            ? projectSqft
+            : 0;
+
+      if (totalSqft <= 0) return;
+
+      // Get current sheet size from first sheet or default
+      const currentSize: DrywallSheetSize = sheets[0]?.size ?? "4x8";
+      const sizeInfo = getSheetSize(currentSize);
+      if (!sizeInfo) return;
+
+      // Calculate total sheets needed
+      const totalSheetsNeeded = calculateSheetsNeeded(
+        totalSqft,
+        currentSize,
+        wasteFactor
+      );
+
+      // Calculate already allocated sheets (those with quantity > 0)
+      const allocatedSheets = sheets.reduce(
+        (sum, s) => sum + (s.quantity > 0 ? s.quantity : 0),
+        0
+      );
+      const remainingSheets = Math.max(0, totalSheetsNeeded - allocatedSheets);
+
+      if (remainingSheets <= 0) return;
+
+      // If no sheets exist, add with default type
+      if (sheets.length === 0) {
+        const typeId = targetTypeId ?? "standard_half";
+        addSheet(typeId, currentSize, remainingSheets);
+        return;
+      }
+
+      // Find the target sheet to update
+      if (targetTypeId) {
+        const targetSheet = sheets.find((s) => s.typeId === targetTypeId);
+        if (targetSheet) {
+          updateSheet(targetSheet.id, {
+            quantity: targetSheet.quantity + remainingSheets,
+          });
+        } else {
+          // Add new sheet with target type
+          addSheet(targetTypeId, currentSize, remainingSheets);
+        }
+      } else {
+        // No target specified - find first sheet with quantity = 0
+        const zeroQtySheet = sheets.find((s) => s.quantity === 0);
+        if (zeroQtySheet) {
+          updateSheet(zeroQtySheet.id, { quantity: remainingSheets });
+        } else if (sheets.length === 1) {
+          // Only one sheet type, add to it
+          updateSheet(sheets[0].id, {
+            quantity: sheets[0].quantity + remainingSheets,
+          });
+        }
+        // If multiple sheets all have qty > 0, do nothing (caller should specify target)
+      }
+    },
+    [
+      inputMode,
+      rooms,
+      projectGrossWallSqft,
+      projectCeilingSqft,
+      sheets,
+      wasteFactor,
+      addSheet,
+      updateSheet,
+    ]
   );
 
   // Addon management
@@ -996,16 +1083,23 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
 
     // Use room sqft if in calculator mode AND rooms exist, otherwise use sheets
     // This handles project wizard which uses setSqft to populate sheets
+    // Also check for project sqft (set via setFromRooms or setSqft) when sheets are empty
+    const projectSqft = projectGrossWallSqft + projectCeilingSqft;
     const grossTotalSqft =
       inputMode === "calculator" && rooms.length > 0
         ? roomGrossSqft
-        : sheetsSqft;
+        : projectSqft > 0
+          ? projectSqft
+          : sheetsSqft;
 
     // Net sqft (with openings deducted) - for reference
+    // For project wizard, use project sqft (we don't track net separately there)
     const totalSqft =
       inputMode === "calculator" && rooms.length > 0
         ? roomTotals.grandTotalSqft
-        : grossTotalSqft;
+        : projectSqft > 0
+          ? projectSqft
+          : grossTotalSqft;
 
     // Total sheets
     const sheetsNeeded = sheets.reduce((sum, s) => sum + s.quantity, 0);
@@ -1065,8 +1159,11 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     let laborSubtotal: number;
     const baseRate = laborPerSqft * sheetTypeMultiplier;
 
-    if (ceilingMultiplierAppliesTo === "all") {
-      // Apply multiplier to all sqft (walls + ceiling)
+    // If no wall/ceiling breakdown (direct sqft mode), apply multiplier to all sqft
+    const hasBreakdown = ceilingSqft > 0 || (grossWallSqft > 0 && grossWallSqft !== grossTotalSqft);
+
+    if (!hasBreakdown || ceilingMultiplierAppliesTo === "all") {
+      // Apply multiplier to all sqft (walls + ceiling, or no breakdown available)
       laborSubtotal = grossTotalSqft * baseRate * ceilingMultiplier;
     } else if (ceilingMultiplierAppliesTo === "ceiling_only") {
       // Only apply multiplier to ceiling sqft
@@ -1173,6 +1270,7 @@ export function useDrywallHangingEstimate(): UseDrywallHangingEstimateReturn {
     calculateSheetsFromRooms,
     setSqft,
     setFromRooms,
+    regenerateSheets,
     setCeilingFactor,
     setWasteFactor,
     setComplexity,

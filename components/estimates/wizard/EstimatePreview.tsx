@@ -96,7 +96,7 @@ export function EstimatePreview() {
             <p className="font-medium text-gray-900">{tradeLabel}</p>
           </div>
           <button
-            onClick={() => goToStep(0)}
+            onClick={() => goToStep(1)}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
           >
             <Edit2 className="w-4 h-4" />
@@ -111,7 +111,7 @@ export function EstimatePreview() {
             </p>
           </div>
           <button
-            onClick={() => goToStep(1)}
+            onClick={() => goToStep(2)}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
           >
             <Edit2 className="w-4 h-4" />
@@ -127,7 +127,7 @@ export function EstimatePreview() {
               </p>
             </div>
             <button
-              onClick={() => goToStep(2)}
+              onClick={() => goToStep(3)}
               className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 flex-shrink-0"
             >
               <Edit2 className="w-4 h-4" />
@@ -141,7 +141,7 @@ export function EstimatePreview() {
             <p className="font-medium text-gray-900">{complexityLabel}</p>
           </div>
           <button
-            onClick={() => goToStep(3)}
+            onClick={() => goToStep(4)}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
           >
             <Edit2 className="w-4 h-4" />

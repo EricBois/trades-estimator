@@ -12,6 +12,7 @@ function toProject(row: Tables<"projects">): Project {
   return {
     id: row.id,
     contractorId: row.contractor_id,
+    clientId: row.client_id,
     name: row.name,
     homeownerName: row.homeowner_name,
     homeownerEmail: row.homeowner_email,
@@ -30,6 +31,7 @@ function toProject(row: Tables<"projects">): Project {
 // Input for creating a project
 export interface CreateProjectInput {
   contractorId: string;
+  clientId?: string;
   name: string;
   homeownerName?: string;
   homeownerEmail?: string;
@@ -40,6 +42,7 @@ export interface CreateProjectInput {
 // Input for updating a project
 export interface UpdateProjectInput {
   id: string;
+  clientId?: string;
   name?: string;
   homeownerName?: string;
   homeownerEmail?: string;
@@ -99,6 +102,7 @@ export function useCreateProject() {
     mutationFn: async (input: CreateProjectInput) => {
       const insert: TablesInsert<"projects"> = {
         contractor_id: input.contractorId,
+        client_id: input.clientId ?? null,
         name: input.name,
         homeowner_name: input.homeownerName ?? "",
         homeowner_email: input.homeownerEmail ?? "",
@@ -132,6 +136,7 @@ export function useUpdateProject() {
     mutationFn: async (input: UpdateProjectInput) => {
       const update: TablesUpdate<"projects"> = {};
 
+      if (input.clientId !== undefined) update.client_id = input.clientId;
       if (input.name !== undefined) update.name = input.name;
       if (input.homeownerName !== undefined)
         update.homeowner_name = input.homeownerName;

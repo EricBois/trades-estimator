@@ -29,6 +29,10 @@ export interface UseProjectEstimateReturn {
   projectName: string;
   setProjectName: (name: string) => void;
 
+  // Client
+  clientId: string | null;
+  setClientId: (id: string | null) => void;
+
   // Rooms (shared)
   roomsHook: ReturnType<typeof useProjectRooms>;
 
@@ -68,6 +72,7 @@ export function useProjectEstimate(
   // Project metadata
   const [projectId] = useState(() => initialProjectId ?? generateId());
   const [projectName, setProjectName] = useState("New Project");
+  const [clientId, setClientId] = useState<string | null>(null);
 
   // Enabled trades
   const [enabledTrades, setEnabledTrades] = useState<ProjectTradeType[]>([
@@ -294,6 +299,7 @@ export function useProjectEstimate(
   // Reset all state
   const reset = useCallback(() => {
     setProjectName("New Project");
+    setClientId(null);
     setEnabledTrades(["drywall_hanging", "drywall_finishing", "painting"]);
     setRoomOverrides(new Map());
     roomsHook.reset();
@@ -331,8 +337,11 @@ export function useProjectEstimate(
           return;
         }
 
-        // Set project name
+        // Set project name and client
         setProjectName(project.name);
+        if (project.client_id) {
+          setClientId(project.client_id);
+        }
 
         // Load rooms
         await roomsHook.loadRooms();
@@ -476,6 +485,10 @@ export function useProjectEstimate(
     projectId,
     projectName,
     setProjectName,
+
+    // Client
+    clientId,
+    setClientId,
 
     // Rooms
     roomsHook,

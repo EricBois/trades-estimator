@@ -9,6 +9,7 @@ const supabase = createClient();
 export interface Estimate {
   id: string;
   contractorId: string;
+  clientId: string | null;
   templateType: string;
   templateId: string | null;
   name: string | null;
@@ -29,6 +30,7 @@ export interface Estimate {
 function toEstimate(e: {
   id: string;
   contractor_id: string;
+  client_id: string | null;
   template_type: string;
   template_id: string | null;
   name?: string | null;
@@ -48,6 +50,7 @@ function toEstimate(e: {
   return {
     id: e.id,
     contractorId: e.contractor_id,
+    clientId: e.client_id,
     templateType: e.template_type,
     templateId: e.template_id,
     name: e.name ?? null,
@@ -106,6 +109,7 @@ export function useEstimate(estimateId: string | undefined) {
 
 export interface CreateEstimateInput {
   contractorId: string;
+  clientId?: string;
   templateType: string;
   templateId?: string;
   name?: string;
@@ -129,6 +133,7 @@ export function useCreateEstimate() {
         .from("estimates")
         .insert({
           contractor_id: input.contractorId,
+          client_id: input.clientId ?? null,
           template_type: input.templateType,
           template_id: input.templateId ?? null,
           name: input.name ?? null,

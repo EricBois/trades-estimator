@@ -1,12 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { Estimate, Template } from "@/hooks";
+import type { Client } from "@/hooks/useClients";
 import type { Project, ProjectStatus } from "@/lib/project/types";
 
 // Transform database row to Estimate
 function toEstimate(e: {
   id: string;
   contractor_id: string;
+  client_id: string | null;
   template_type: string;
   template_id: string | null;
   name?: string | null;
@@ -26,6 +28,7 @@ function toEstimate(e: {
   return {
     id: e.id,
     contractorId: e.contractor_id,
+    clientId: e.client_id,
     templateType: e.template_type,
     templateId: e.template_id,
     name: e.name ?? null,
@@ -246,6 +249,7 @@ export async function getDefaultTemplates(): Promise<Template[]> {
 function toProject(row: {
   id: string;
   contractor_id: string;
+  client_id: string | null;
   name: string;
   homeowner_name: string;
   homeowner_email: string;
@@ -262,6 +266,7 @@ function toProject(row: {
   return {
     id: row.id,
     contractorId: row.contractor_id,
+    clientId: row.client_id,
     name: row.name,
     homeownerName: row.homeowner_name,
     homeownerEmail: row.homeowner_email,
@@ -286,6 +291,100 @@ export async function getProjects(): Promise<Project[]> {
     .from("projects")
     .select("*")
     .eq("contractor_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data?.map(toProject) ?? [];
+}
+
+// Transform database row to Client
+function toClient(c: {
+  id: string;
+  contractor_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}): Client {
+  return {
+    id: c.id,
+    contractorId: c.contractor_id,
+    name: c.name,
+    email: c.email,
+    phone: c.phone,
+    street: c.street,
+    city: c.city,
+    state: c.state,
+    zip: c.zip,
+    notes: c.notes,
+    createdAt: c.created_at ?? new Date().toISOString(),
+    updatedAt: c.updated_at ?? new Date().toISOString(),
+  };
+}
+
+// Get clients for authenticated user
+export async function getClients(): Promise<Client[]> {
+  const { user } = await getAuthenticatedUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("contractor_id", user.id)
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return data?.map(toClient) ?? [];
+}
+
+// Get single client
+export async function getClient(id: string): Promise<Client | null> {
+  const { user } = await getAuthenticatedUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("id", id)
+    .eq("contractor_id", user.id)
+    .single();
+
+  if (error) return null;
+  return toClient(data);
+}
+
+// Get estimates for a specific client
+export async function getClientEstimates(clientId: string): Promise<Estimate[]> {
+  const { user } = await getAuthenticatedUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("estimates")
+    .select("*")
+    .eq("contractor_id", user.id)
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data?.map(toEstimate) ?? [];
+}
+
+// Get projects for a specific client
+export async function getClientProjects(clientId: string): Promise<Project[]> {
+  const { user } = await getAuthenticatedUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("contractor_id", user.id)
+    .eq("client_id", clientId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;

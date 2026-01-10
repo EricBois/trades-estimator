@@ -1,14 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Mail, Phone, User, FileText } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useWizard } from "react-use-wizard";
+import { Mail, Phone, User, FileText, Users, Edit2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
 import { useWizardFooter } from "../WizardFooterContext";
-import { useCreateProject, useCreateEstimate } from "@/hooks";
+import { useCreateProject, useCreateEstimate, useSendEstimateEmail } from "@/hooks";
+import { useClient } from "@/hooks/useClients";
 import { StepHeader } from "@/components/ui/StepHeader";
+import { getTradeDisplayInfo } from "@/lib/project/types";
+import type {
+  EstimatePDFData,
+  PDFTradeBreakdown,
+  PDFRoom,
+  DetailLevel,
+} from "@/lib/pdf/types";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -21,11 +30,15 @@ function formatCurrency(value: number): string {
 
 export function ProjectSendEstimate() {
   const router = useRouter();
-  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const { goToStep } = useWizard();
+  const { user, profile } = useAuth();
   const { setFooterConfig } = useWizardFooter();
   const {
     projectName,
     setProjectName,
+    clientId,
+    setClientId,
     enabledTrades,
     projectTotals,
     tradeTotals,
@@ -33,12 +46,24 @@ export function ProjectSendEstimate() {
     finishingEstimate,
     paintingEstimate,
     roomsHook,
+    getTradeRoomViews,
   } = useProjectEstimateContext();
+
+  // Fetch selected client details for display
+  const { data: selectedClient } = useClient(clientId ?? undefined);
+
+  // Default detail level for PDF
+  const pdfDetailLevel: DetailLevel = "detailed";
 
   const createProject = useCreateProject();
   const createEstimate = useCreateEstimate();
+  const sendEstimateEmail = useSendEstimateEmail();
 
-  // Form state
+  // Get clientId from URL if present (for deep linking)
+  const urlClientId = searchParams.get("clientId");
+  const { data: urlClient } = useClient(urlClientId ?? undefined);
+
+  // Form state (only used when no client is selected)
   const [homeownerName, setHomeownerName] = useState("");
   const [homeownerEmail, setHomeownerEmail] = useState("");
   const [homeownerPhone, setHomeownerPhone] = useState("");
@@ -46,10 +71,115 @@ export function ProjectSendEstimate() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Validation
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(homeownerEmail);
-  const canSubmit =
-    homeownerName.trim() !== "" && homeownerEmail.trim() !== "" && isEmailValid;
+  // Initialize clientId from URL on mount
+  useEffect(() => {
+    if (urlClientId && !clientId) {
+      setClientId(urlClientId);
+    }
+  }, [urlClientId, clientId, setClientId]);
+
+  // Auto-fill homeowner fields when client is loaded from URL
+  useEffect(() => {
+    if (urlClient && !homeownerName && !homeownerEmail) {
+      setHomeownerName(urlClient.name);
+      setHomeownerEmail(urlClient.email ?? "");
+      setHomeownerPhone(urlClient.phone ?? "");
+    }
+  }, [urlClient, homeownerName, homeownerEmail]);
+
+  // Determine if we have an email (from client or manual entry)
+  const hasEmail = !!(selectedClient?.email || homeownerEmail.trim());
+
+  // Get the effective recipient data (client takes precedence)
+  const recipientName = selectedClient?.name || homeownerName;
+  const recipientEmail = selectedClient?.email || homeownerEmail;
+  const recipientPhone = selectedClient?.phone || homeownerPhone;
+
+  // Validation - only validate manual fields when no client
+  const isEmailValid = !selectedClient && homeownerEmail ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(homeownerEmail) : true;
+  const canSubmit = selectedClient ? true : (homeownerName.trim() !== "" && homeownerEmail.trim() !== "" && isEmailValid);
+
+  // Build PDF data for email
+  const buildPdfData = useCallback((): EstimatePDFData | null => {
+    if (!profile) return null;
+
+    // Build trade breakdowns
+    const trades: PDFTradeBreakdown[] = enabledTrades.map((tradeType) => {
+      const totals = tradeTotals[tradeType];
+      const displayInfo = getTradeDisplayInfo(tradeType);
+
+      // Build room data for this trade
+      const tradeRoomViews = getTradeRoomViews(tradeType);
+      const rooms: PDFRoom[] = tradeRoomViews
+        .filter((r) => !r.excluded)
+        .map((room) => ({
+          name: room.name,
+          wallSqft: room.effectiveWallSqft,
+          ceilingSqft: room.effectiveCeilingSqft,
+          totalSqft: room.effectiveTotalSqft,
+        }));
+
+      return {
+        tradeType,
+        label: displayInfo.label,
+        rooms: rooms.length > 0 ? rooms : undefined,
+        materialSubtotal: totals?.materialSubtotal ?? 0,
+        laborSubtotal: totals?.laborSubtotal ?? 0,
+        addonsSubtotal: totals?.addonsSubtotal ?? 0,
+        complexityLabel:
+          totals?.complexityMultiplier === 1
+            ? undefined
+            : totals?.complexityMultiplier === 0.8
+              ? "Simple"
+              : totals?.complexityMultiplier === 1.3
+                ? "Complex"
+                : undefined,
+        complexityAdjustment: totals?.complexityAdjustment ?? 0,
+        total: totals?.total ?? 0,
+      };
+    });
+
+    // Build overall room summary
+    const rooms: PDFRoom[] = roomsHook.rooms.map((room) => ({
+      name: room.name,
+      wallSqft: room.wallSqft,
+      ceilingSqft: room.ceilingSqft,
+      totalSqft: room.totalSqft,
+    }));
+
+    return {
+      contractor: {
+        companyName: profile.company_name ?? "Contractor",
+        email: user?.email ?? "",
+        logoUrl: profile.logo_url ?? undefined,
+      },
+      recipient: {
+        name: recipientName || "Homeowner",
+        email: recipientEmail || "",
+        phone: recipientPhone || undefined,
+      },
+      projectName: projectName || "Project Estimate",
+      projectDescription: notes || undefined,
+      trades,
+      rooms: rooms.length > 0 ? rooms : undefined,
+      total: projectTotals.combinedTotal,
+      createdAt: new Date(),
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    };
+  }, [
+    profile,
+    user,
+    projectName,
+    notes,
+    recipientName,
+    recipientEmail,
+    recipientPhone,
+    enabledTrades,
+    tradeTotals,
+    projectTotals,
+    roomsHook.rooms,
+    getTradeRoomViews,
+  ]);
 
   const handleSubmit = useCallback(async () => {
     if (!user || !canSubmit) return;
@@ -61,10 +191,11 @@ export function ProjectSendEstimate() {
       // 1. Create the project
       const project = await createProject.mutateAsync({
         contractorId: user.id,
+        clientId: clientId ?? undefined,
         name: projectName || "Multi-Trade Project",
-        homeownerName,
-        homeownerEmail,
-        homeownerPhone: homeownerPhone || undefined,
+        homeownerName: recipientName || "",
+        homeownerEmail: recipientEmail || "",
+        homeownerPhone: recipientPhone || undefined,
         projectDescription: notes || undefined,
       });
 
@@ -110,16 +241,39 @@ export function ProjectSendEstimate() {
 
         await createEstimate.mutateAsync({
           contractorId: user.id,
+          clientId: clientId ?? undefined,
           templateType: tradeType,
-          homeownerName,
-          homeownerEmail,
-          homeownerPhone: homeownerPhone || undefined,
+          homeownerName: recipientName || "",
+          homeownerEmail: recipientEmail || "",
+          homeownerPhone: recipientPhone || undefined,
           projectDescription: `${projectName} - ${tradeType.replace("_", " ")}`,
           parameters,
           rangeLow: totals.total,
           rangeHigh: totals.total,
           projectId: project.id,
         });
+      }
+
+      // 4. Send the email with PDF attachment (only if we have an email)
+      const pdfData = buildPdfData();
+      if (pdfData && recipientEmail) {
+        try {
+          await sendEstimateEmail.mutateAsync({
+            projectId: project.id,
+            recipientEmail: recipientEmail.trim(),
+            recipientName: recipientName?.trim() || "",
+            recipientPhone: recipientPhone?.trim() || undefined,
+            projectName: projectName || "Multi-Trade Project",
+            projectDescription: notes || undefined,
+            rangeLow: projectTotals.combinedTotal,
+            rangeHigh: projectTotals.combinedTotal,
+            pdfData,
+            detailLevel: pdfDetailLevel || "detailed",
+          });
+        } catch (emailError) {
+          // Log but don't fail - project was created
+          console.error("Failed to send email:", emailError);
+        }
       }
 
       // Navigate to project or estimates page
@@ -134,10 +288,11 @@ export function ProjectSendEstimate() {
     user,
     canSubmit,
     createProject,
+    clientId,
     projectName,
-    homeownerName,
-    homeownerEmail,
-    homeownerPhone,
+    recipientName,
+    recipientEmail,
+    recipientPhone,
     notes,
     roomsHook,
     enabledTrades,
@@ -146,6 +301,10 @@ export function ProjectSendEstimate() {
     finishingEstimate,
     paintingEstimate,
     createEstimate,
+    sendEstimateEmail,
+    buildPdfData,
+    projectTotals,
+    pdfDetailLevel,
     router,
   ]);
 
@@ -157,7 +316,7 @@ export function ProjectSendEstimate() {
     handleSubmitRef.current = handleSubmit;
   });
 
-  // Configure footer with send button
+  // Configure footer - always show Send Estimate but disable when no email
   useEffect(() => {
     setFooterConfig({
       onContinue: () => handleSubmitRef.current(),
@@ -165,10 +324,10 @@ export function ProjectSendEstimate() {
       icon: "send",
       isLoading: isSubmitting,
       loadingText: "Sending...",
-      disabled: !canSubmit,
+      disabled: !hasEmail || !canSubmit,
     });
     return () => setFooterConfig(null);
-  }, [setFooterConfig, isSubmitting, canSubmit]);
+  }, [setFooterConfig, isSubmitting, canSubmit, hasEmail]);
 
   return (
     <div className="flex flex-col h-full">
@@ -179,7 +338,7 @@ export function ProjectSendEstimate() {
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         <div className="max-w-lg mx-auto space-y-6">
-          {/* Project name */}
+          {/* Project name - at the top */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Project Name
@@ -196,66 +355,107 @@ export function ProjectSendEstimate() {
             </div>
           </div>
 
-          {/* Homeowner name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Homeowner Name <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={homeownerName}
-                onChange={(e) => setHomeownerName(e.target.value)}
-                placeholder="John Smith"
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
-              />
+          {/* Selected Client Display - shows when client is selected */}
+          {selectedClient ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{selectedClient.name}</p>
+                    {selectedClient.email ? (
+                      <div className="flex items-center gap-1.5 text-sm text-gray-600 mt-1">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{selectedClient.email}</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-amber-600 mt-1">No email on file</p>
+                    )}
+                    {selectedClient.phone && (
+                      <div className="flex items-center gap-1.5 text-sm text-gray-600 mt-0.5">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{selectedClient.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goToStep(0)}
+                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Change
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Manual entry fields - show when no client selected */
+            <>
+              {/* Homeowner name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Homeowner Name <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={homeownerName}
+                    onChange={(e) => setHomeownerName(e.target.value)}
+                    placeholder="John Smith"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
+                  />
+                </div>
+              </div>
 
-          {/* Homeowner email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Homeowner Email <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="email"
-                value={homeownerEmail}
-                onChange={(e) => setHomeownerEmail(e.target.value)}
-                placeholder="john@example.com"
-                className={cn(
-                  "w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-0",
-                  homeownerEmail && !isEmailValid
-                    ? "border-red-300 focus:border-red-500"
-                    : "border-gray-200 focus:border-blue-500"
+              {/* Homeowner email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Homeowner Email <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={homeownerEmail}
+                    onChange={(e) => setHomeownerEmail(e.target.value)}
+                    placeholder="john@example.com"
+                    className={cn(
+                      "w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-0",
+                      homeownerEmail && !isEmailValid
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-200 focus:border-blue-500"
+                    )}
+                  />
+                </div>
+                {homeownerEmail && !isEmailValid && (
+                  <p className="mt-1 text-sm text-red-500">
+                    Please enter a valid email address
+                  </p>
                 )}
-              />
-            </div>
-            {homeownerEmail && !isEmailValid && (
-              <p className="mt-1 text-sm text-red-500">
-                Please enter a valid email address
-              </p>
-            )}
-          </div>
+              </div>
 
-          {/* Homeowner phone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number (optional)
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="tel"
-                value={homeownerPhone}
-                onChange={(e) => setHomeownerPhone(e.target.value)}
-                placeholder="(555) 123-4567"
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
-              />
-            </div>
-          </div>
+              {/* Homeowner phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number (optional)
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={homeownerPhone}
+                    onChange={(e) => setHomeownerPhone(e.target.value)}
+                    placeholder="(555) 123-4567"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Notes */}
           <div>

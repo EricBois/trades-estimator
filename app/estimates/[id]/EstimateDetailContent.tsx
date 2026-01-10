@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -22,8 +23,14 @@ import {
   Edit,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { useUpdateEstimate, useDeleteEstimate } from "@/hooks";
+import {
+  useUpdateEstimate,
+  useDeleteEstimate,
+  useSendEstimateEmail,
+} from "@/hooks";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDate, formatRelative, isExpired, cn } from "@/lib/utils";
+import type { EstimatePDFData } from "@/lib/pdf/types";
 
 // Trade type labels for display
 const TRADE_LABELS: Record<string, string> = {
@@ -270,8 +277,11 @@ export function EstimateDetailContent({
   estimate,
 }: EstimateDetailContentProps) {
   const router = useRouter();
+  const { profile, user } = useAuth();
   const updateEstimate = useUpdateEstimate();
   const deleteEstimate = useDeleteEstimate();
+  const sendEstimateEmail = useSendEstimateEmail();
+  const [isSending, setIsSending] = useState(false);
 
   const effectiveStatus =
     estimate.status === "sent" &&
@@ -292,11 +302,63 @@ export function EstimateDetailContent({
       .replace(/\b\w/g, (c) => c.toUpperCase());
 
   const handleSend = async () => {
-    await updateEstimate.mutateAsync({
-      id: estimate.id,
-      status: "sent",
-    });
-    router.refresh();
+    if (!profile) return;
+
+    setIsSending(true);
+    try {
+      // Build basic PDF data from estimate
+      const pdfData: EstimatePDFData = {
+        contractor: {
+          companyName: profile.company_name ?? "Contractor",
+          email: user?.email ?? "",
+          logoUrl: profile.logo_url ?? undefined,
+        },
+        recipient: {
+          name: estimate.homeownerName,
+          email: estimate.homeownerEmail,
+          phone: estimate.homeownerPhone ?? undefined,
+        },
+        projectName: tradeLabel,
+        projectDescription: estimate.projectDescription ?? undefined,
+        singleTrade: {
+          tradeType: estimate.templateType,
+          tradeLabel,
+        },
+        total: (estimate.rangeLow + estimate.rangeHigh) / 2,
+        rangeLow: estimate.rangeLow,
+        rangeHigh: estimate.rangeHigh,
+        createdAt: new Date(estimate.createdAt),
+        validUntil: estimate.expiresAt
+          ? new Date(estimate.expiresAt)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      };
+
+      // Send email
+      await sendEstimateEmail.mutateAsync({
+        estimateId: estimate.id,
+        recipientEmail: estimate.homeownerEmail,
+        recipientName: estimate.homeownerName,
+        recipientPhone: estimate.homeownerPhone ?? undefined,
+        projectName: tradeLabel,
+        projectDescription: estimate.projectDescription ?? undefined,
+        rangeLow: estimate.rangeLow,
+        rangeHigh: estimate.rangeHigh,
+        pdfData,
+        detailLevel: "simple", // Use simple for resends from detail page
+      });
+
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to send estimate:", error);
+      // Still update status even if email fails
+      await updateEstimate.mutateAsync({
+        id: estimate.id,
+        status: "sent",
+      });
+      router.refresh();
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -354,15 +416,15 @@ export function EstimateDetailContent({
               {estimate.status === "draft" && (
                 <button
                   onClick={handleSend}
-                  disabled={updateEstimate.isPending}
+                  disabled={isSending}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  {updateEstimate.isPending ? (
+                  {isSending ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  Send to Customer
+                  {isSending ? "Sending..." : "Send to Customer"}
                 </button>
               )}
               <button
