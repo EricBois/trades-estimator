@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   User,
@@ -28,16 +30,7 @@ const clientSchema = z.object({
   notes: z.string().optional(),
 });
 
-interface ClientFormData {
-  name: string;
-  email: string;
-  phone: string;
-  street: string;
-  city: string;
-  state: string;
-  zip: string;
-  notes: string;
-}
+type ClientFormData = z.infer<typeof clientSchema>;
 
 interface ClientFormProps {
   initialData?: Partial<ClientFormData>;
@@ -57,52 +50,32 @@ export function ClientForm({
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
 
-  const [formData, setFormData] = useState<ClientFormData>({
-    name: initialData?.name ?? "",
-    email: initialData?.email ?? "",
-    phone: initialData?.phone ?? "",
-    street: initialData?.street ?? "",
-    city: initialData?.city ?? "",
-    state: initialData?.state ?? "",
-    zip: initialData?.zip ?? "",
-    notes: initialData?.notes ?? "",
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ClientFormData>({
+    resolver: zodResolver(clientSchema),
+    mode: "onBlur",
+    defaultValues: {
+      name: initialData?.name ?? "",
+      email: initialData?.email ?? "",
+      phone: initialData?.phone ?? "",
+      street: initialData?.street ?? "",
+      city: initialData?.city ?? "",
+      state: initialData?.state ?? "",
+      zip: initialData?.zip ?? "",
+      notes: initialData?.notes ?? "",
+    },
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const isEditing = !!clientId;
   const isSubmitting = createClient.isPending || updateClient.isPending;
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[name];
-        return next;
-      });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate
-    const result = clientSchema.safeParse(formData);
-    if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      result.error.issues.forEach((issue) => {
-        const path = issue.path[0];
-        if (path) fieldErrors[path.toString()] = issue.message;
-      });
-      setErrors(fieldErrors);
-      return;
-    }
-
+  const onSubmit = async (formData: ClientFormData) => {
     if (!profile) return;
+    setSubmitError(null);
 
     try {
       if (isEditing) {
@@ -135,15 +108,14 @@ export function ClientForm({
         router.push(`/clients/${client.id}`);
       }
     } catch (error) {
-      setErrors({
-        submit:
-          error instanceof Error ? error.message : "Failed to save client",
-      });
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to save client"
+      );
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Name */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -151,10 +123,8 @@ export function ClientForm({
           Name <span className="text-red-500">*</span>
         </label>
         <input
+          {...register("name")}
           type="text"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
           placeholder="John Smith"
           className={cn(
             "w-full min-h-[48px] px-4 py-3 text-base",
@@ -164,7 +134,7 @@ export function ClientForm({
           )}
         />
         {errors.name && (
-          <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+          <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
         )}
       </div>
 
@@ -175,10 +145,8 @@ export function ClientForm({
           Email
         </label>
         <input
+          {...register("email")}
           type="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
           placeholder="john@example.com"
           inputMode="email"
           className={cn(
@@ -189,7 +157,7 @@ export function ClientForm({
           )}
         />
         {errors.email && (
-          <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+          <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
         )}
       </div>
 
@@ -200,10 +168,8 @@ export function ClientForm({
           Phone
         </label>
         <input
+          {...register("phone")}
           type="tel"
-          name="phone"
-          value={formData.phone}
-          onChange={handleChange}
           placeholder="(555) 555-5555"
           inputMode="tel"
           className={cn(
@@ -223,10 +189,8 @@ export function ClientForm({
 
         {/* Street */}
         <input
+          {...register("street")}
           type="text"
-          name="street"
-          value={formData.street}
-          onChange={handleChange}
           placeholder="Street address"
           className={cn(
             "w-full min-h-[48px] px-4 py-3 text-base",
@@ -238,10 +202,8 @@ export function ClientForm({
         {/* City, State, Zip */}
         <div className="grid grid-cols-6 gap-3">
           <input
+            {...register("city")}
             type="text"
-            name="city"
-            value={formData.city}
-            onChange={handleChange}
             placeholder="City"
             className={cn(
               "col-span-3 min-h-[48px] px-4 py-3 text-base",
@@ -250,10 +212,8 @@ export function ClientForm({
             )}
           />
           <input
+            {...register("state")}
             type="text"
-            name="state"
-            value={formData.state}
-            onChange={handleChange}
             placeholder="State"
             className={cn(
               "col-span-1 min-h-[48px] px-4 py-3 text-base",
@@ -262,10 +222,8 @@ export function ClientForm({
             )}
           />
           <input
+            {...register("zip")}
             type="text"
-            name="zip"
-            value={formData.zip}
-            onChange={handleChange}
             placeholder="ZIP"
             inputMode="numeric"
             className={cn(
@@ -284,9 +242,7 @@ export function ClientForm({
           Notes
         </label>
         <textarea
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
+          {...register("notes")}
           placeholder="Any additional notes about this client..."
           rows={3}
           className={cn(
@@ -298,9 +254,9 @@ export function ClientForm({
       </div>
 
       {/* Submit Error */}
-      {errors.submit && (
+      {submitError && (
         <div className="rounded-lg bg-red-50 border border-red-200 p-4">
-          <p className="text-sm text-red-700">{errors.submit}</p>
+          <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Check, Plus, Minus } from "lucide-react";
 import { useDrywallEstimateSafe } from "./DrywallEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
@@ -15,12 +16,29 @@ import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { CustomAddonInput } from "@/components/ui/CustomAddonInput";
 import { CustomAddonCard } from "@/components/ui/CustomAddonCard";
+import { ZodForm } from "@/components/ui/ZodForm";
 
+const drywallAddonsSchema = z.object({}).passthrough();
+
+// Wrapper component that provides ZodForm context
 export function DrywallAddonsStep({
   finishingEstimate,
 }: {
   finishingEstimate?: UseDrywallFinishingEstimateReturn;
 } = {}) {
+  return (
+    <ZodForm schema={drywallAddonsSchema} defaultValues={{}}>
+      <DrywallAddonsStepContent finishingEstimate={finishingEstimate} />
+    </ZodForm>
+  );
+}
+
+// Content component
+function DrywallAddonsStepContent({
+  finishingEstimate,
+}: {
+  finishingEstimate?: UseDrywallFinishingEstimateReturn;
+}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
 

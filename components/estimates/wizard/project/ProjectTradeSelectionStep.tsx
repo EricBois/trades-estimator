@@ -2,12 +2,18 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Hammer, Sparkles, Paintbrush, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
 import { useWizardFooter } from "../WizardFooterContext";
 import { TRADE_DISPLAY_INFO } from "@/lib/project/types";
 import { StepHeader } from "@/components/ui/StepHeader";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const tradeSelectionSchema = z.object({
+  projectName: z.string().optional(),
+});
 
 // Icon mapping
 const TRADE_ICONS = {
@@ -16,7 +22,22 @@ const TRADE_ICONS = {
   painting: Paintbrush,
 };
 
+// Wrapper component that provides ZodForm context
 export function ProjectTradeSelectionStep() {
+  const { projectName } = useProjectEstimateContext();
+
+  return (
+    <ZodForm
+      schema={tradeSelectionSchema}
+      defaultValues={{ projectName }}
+    >
+      <ProjectTradeSelectionStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function ProjectTradeSelectionStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const {

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { z } from "zod";
 import { Mail, User, Phone, FileText } from "lucide-react";
 import { useDrywallEstimate } from "./DrywallEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
@@ -10,13 +9,42 @@ import { useCreateEstimate } from "@/hooks/useEstimates";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
+import { sendEstimateSchema } from "@/lib/schemas/wizard";
+import { ZodForm, useZodForm } from "@/components/ui/ZodForm";
+
+type SendFormData = {
+  homeownerName: string;
+  homeownerEmail: string;
+  homeownerPhone?: string;
+  projectDescription?: string;
+};
 
 interface DrywallSendEstimateProps {
   estimateId?: string;
   estimateName?: string;
 }
 
+// Wrapper component that provides ZodForm context
 export function DrywallSendEstimate({
+  estimateName,
+}: DrywallSendEstimateProps) {
+  return (
+    <ZodForm
+      schema={sendEstimateSchema}
+      defaultValues={{
+        homeownerName: "",
+        homeownerEmail: "",
+        homeownerPhone: "",
+        projectDescription: "",
+      }}
+    >
+      <DrywallSendEstimateContent estimateName={estimateName} />
+    </ZodForm>
+  );
+}
+
+// Content component
+function DrywallSendEstimateContent({
   estimateName,
 }: DrywallSendEstimateProps) {
   const router = useRouter();
@@ -26,33 +54,23 @@ export function DrywallSendEstimate({
   const { finishLevel, lineItems, addons, complexity, totals } =
     useDrywallEstimate();
 
-  const [homeownerName, setHomeownerName] = useState("");
-  const [homeownerEmail, setHomeownerEmail] = useState("");
-  const [homeownerPhone, setHomeownerPhone] = useState("");
-  const [projectDescription, setProjectDescription] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const {
+    register,
+    trigger,
+    getValues,
+    formState: { errors },
+  } = useZodForm();
+
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const validate = useCallback(() => {
-    const newErrors: Record<string, string> = {};
-
-    if (!homeownerName.trim()) {
-      newErrors.homeownerName = "Name is required";
-    }
-    if (!homeownerEmail.trim()) {
-      newErrors.homeownerEmail = "Email is required";
-    } else if (!z.string().email().safeParse(homeownerEmail).success) {
-      newErrors.homeownerEmail = "Please enter a valid email";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [homeownerName, homeownerEmail]);
-
   const handleSubmit = useCallback(async () => {
-    if (!validate() || !profile) return;
+    const isValid = await trigger();
+    if (!isValid || !profile) return;
 
+    const formData = getValues();
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       // Prepare drywall-specific parameters
@@ -82,10 +100,10 @@ export function DrywallSendEstimate({
         contractorId: profile.id,
         templateType: "drywall_finishing",
         name: estimateName?.trim() || undefined,
-        homeownerName: homeownerName.trim(),
-        homeownerEmail: homeownerEmail.trim(),
-        homeownerPhone: homeownerPhone.trim() || undefined,
-        projectDescription: projectDescription.trim() || undefined,
+        homeownerName: formData.homeownerName.trim(),
+        homeownerEmail: formData.homeownerEmail.trim(),
+        homeownerPhone: formData.homeownerPhone?.trim() || undefined,
+        projectDescription: formData.projectDescription?.trim() || undefined,
         parameters,
         rangeLow: totals.total,
         rangeHigh: totals.total,
@@ -94,15 +112,15 @@ export function DrywallSendEstimate({
       router.push(`/estimates/${estimate.id}`);
     } catch (error) {
       console.error("Failed to create estimate:", error);
-      setErrors({
-        submit:
-          error instanceof Error ? error.message : "Failed to create estimate",
-      });
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to create estimate"
+      );
     } finally {
       setIsSubmitting(false);
     }
   }, [
-    validate,
+    trigger,
+    getValues,
     profile,
     finishLevel,
     lineItems,
@@ -111,10 +129,6 @@ export function DrywallSendEstimate({
     totals,
     createEstimate,
     estimateName,
-    homeownerName,
-    homeownerEmail,
-    homeownerPhone,
-    projectDescription,
     router,
   ]);
 
@@ -162,9 +176,8 @@ export function DrywallSendEstimate({
             Name
           </label>
           <input
+            {...register("homeownerName")}
             type="text"
-            value={homeownerName}
-            onChange={(e) => setHomeownerName(e.target.value)}
             placeholder="John Smith"
             className={cn(
               "w-full min-h-[56px] px-4 py-3 text-base",
@@ -174,7 +187,7 @@ export function DrywallSendEstimate({
             )}
           />
           {errors.homeownerName && (
-            <p className="mt-1 text-sm text-red-600">{errors.homeownerName}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.homeownerName.message as string}</p>
           )}
         </div>
 
@@ -185,9 +198,8 @@ export function DrywallSendEstimate({
             Email
           </label>
           <input
+            {...register("homeownerEmail")}
             type="email"
-            value={homeownerEmail}
-            onChange={(e) => setHomeownerEmail(e.target.value)}
             placeholder="john@example.com"
             inputMode="email"
             className={cn(
@@ -198,7 +210,7 @@ export function DrywallSendEstimate({
             )}
           />
           {errors.homeownerEmail && (
-            <p className="mt-1 text-sm text-red-600">{errors.homeownerEmail}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.homeownerEmail.message as string}</p>
           )}
         </div>
 
@@ -209,9 +221,8 @@ export function DrywallSendEstimate({
             Phone <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <input
+            {...register("homeownerPhone")}
             type="tel"
-            value={homeownerPhone}
-            onChange={(e) => setHomeownerPhone(e.target.value)}
             placeholder="(555) 555-5555"
             inputMode="tel"
             className={cn(
@@ -229,8 +240,7 @@ export function DrywallSendEstimate({
             Notes <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <textarea
-            value={projectDescription}
-            onChange={(e) => setProjectDescription(e.target.value)}
+            {...register("projectDescription")}
             placeholder="Any additional notes about the project..."
             rows={3}
             className={cn(
@@ -243,9 +253,9 @@ export function DrywallSendEstimate({
       </div>
 
       {/* Submit Error */}
-      {errors.submit && (
+      {submitError && (
         <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-4">
-          <p className="text-sm text-red-700">{errors.submit}</p>
+          <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
     </div>

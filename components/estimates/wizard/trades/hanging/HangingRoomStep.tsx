@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import {
   Plus,
   Trash2,
@@ -18,6 +19,9 @@ import { ShapeSelector } from "./ShapeSelector";
 import { ShapeDimensionInputs } from "./ShapeDimensionInputs";
 import { HangingRoom, WallSegment } from "@/lib/trades/drywallHanging/types";
 import { StepHeader } from "@/components/ui/StepHeader";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const hangingRoomSchema = z.object({}).passthrough();
 
 interface RoomCardProps {
   room: HangingRoom;
@@ -251,7 +255,20 @@ function RoomCard({
   );
 }
 
+// Wrapper component that provides ZodForm context
 export function HangingRoomStep() {
+  return (
+    <ZodForm
+      schema={hangingRoomSchema}
+      defaultValues={{}}
+    >
+      <HangingRoomStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function HangingRoomStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const {

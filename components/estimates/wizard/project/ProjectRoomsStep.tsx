@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import {
   Plus,
   LayoutGrid,
@@ -19,6 +20,9 @@ import { ShapeSelector } from "../trades/hanging/ShapeSelector";
 import { ShapeDimensionInputs } from "../trades/hanging/ShapeDimensionInputs";
 import { HangingOpeningsSheet } from "../trades/hanging/HangingOpeningsSheet";
 import { ProjectRoom, WallSegment } from "@/lib/project/types";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const projectRoomsSchema = z.object({}).passthrough();
 
 interface RoomCardProps {
   room: ProjectRoom;
@@ -243,11 +247,25 @@ function RoomCard({
   );
 }
 
+// Wrapper component that provides ZodForm context
 export function ProjectRoomsStep() {
+  return (
+    <ZodForm
+      schema={projectRoomsSchema}
+      defaultValues={{}}
+    >
+      <ProjectRoomsStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function ProjectRoomsStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const { roomsHook, hangingEstimate, finishingEstimate, paintingEstimate } =
     useProjectEstimateContext();
+
   const {
     rooms,
     totalSqft,

@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Layers, FileText } from "lucide-react";
 import { useDrywallEstimateSafe } from "./DrywallEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
@@ -11,6 +12,11 @@ import {
   UseDrywallFinishingEstimateReturn,
 } from "@/lib/trades/drywallFinishing/types";
 import { cn } from "@/lib/utils";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const finishLevelSchema = z.object({
+  estimateName: z.string().optional(),
+});
 
 interface DrywallFinishLevelStepProps {
   finishingEstimate?: UseDrywallFinishingEstimateReturn;
@@ -18,7 +24,25 @@ interface DrywallFinishLevelStepProps {
   onEstimateNameChange?: (name: string) => void;
 }
 
+// Wrapper component that provides ZodForm context
 export function DrywallFinishLevelStep({
+  finishingEstimate,
+  estimateName = "",
+  onEstimateNameChange,
+}: DrywallFinishLevelStepProps) {
+  return (
+    <ZodForm schema={finishLevelSchema} defaultValues={{ estimateName }}>
+      <DrywallFinishLevelStepContent
+        finishingEstimate={finishingEstimate}
+        estimateName={estimateName}
+        onEstimateNameChange={onEstimateNameChange}
+      />
+    </ZodForm>
+  );
+}
+
+// Content component
+function DrywallFinishLevelStepContent({
   finishingEstimate,
   estimateName = "",
   onEstimateNameChange,

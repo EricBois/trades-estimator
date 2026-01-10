@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWizard } from "react-use-wizard";
-import { Mail, Phone, User, FileText, Users, Edit2 } from "lucide-react";
+import { Mail, Phone, User, FileText, Users, Edit2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
@@ -12,6 +12,8 @@ import { useCreateProject, useCreateEstimate, useSendEstimateEmail } from "@/hoo
 import { useClient } from "@/hooks/useClients";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { getTradeDisplayInfo } from "@/lib/project/types";
+import { projectSendEstimateSchema } from "@/lib/schemas/wizard";
+import { ZodForm, useZodForm } from "@/components/ui/ZodForm";
 import type {
   EstimatePDFData,
   PDFTradeBreakdown,
@@ -28,7 +30,29 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+// Wrapper component that provides ZodForm context
 export function ProjectSendEstimate() {
+  const { projectName } = useProjectEstimateContext();
+
+  return (
+    <ZodForm
+      schema={projectSendEstimateSchema}
+      defaultValues={{
+        projectName: projectName || "",
+        homeownerName: "",
+        homeownerEmail: "",
+        homeownerPhone: "",
+        projectDescription: "",
+      }}
+      resetOnDefaultValueChange
+    >
+      <ProjectSendEstimateContent />
+    </ZodForm>
+  );
+}
+
+// Content component that uses useZodForm for form access
+function ProjectSendEstimateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { goToStep } = useWizard();
@@ -49,6 +73,9 @@ export function ProjectSendEstimate() {
     getTradeRoomViews,
   } = useProjectEstimateContext();
 
+  // Get form methods from ZodForm context
+  const { register, formState: { errors }, trigger, getValues, reset, watch } = useZodForm();
+
   // Fetch selected client details for display
   const { data: selectedClient } = useClient(clientId ?? undefined);
 
@@ -63,13 +90,9 @@ export function ProjectSendEstimate() {
   const urlClientId = searchParams.get("clientId");
   const { data: urlClient } = useClient(urlClientId ?? undefined);
 
-  // Form state (only used when no client is selected)
-  const [homeownerName, setHomeownerName] = useState("");
-  const [homeownerEmail, setHomeownerEmail] = useState("");
-  const [homeownerPhone, setHomeownerPhone] = useState("");
-  const [notes, setNotes] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Watch form values for validation
+  const watchedName = watch("homeownerName");
+  const watchedEmail = watch("homeownerEmail");
 
   // Initialize clientId from URL on mount
   useEffect(() => {
@@ -80,24 +103,43 @@ export function ProjectSendEstimate() {
 
   // Auto-fill homeowner fields when client is loaded from URL
   useEffect(() => {
-    if (urlClient && !homeownerName && !homeownerEmail) {
-      setHomeownerName(urlClient.name);
-      setHomeownerEmail(urlClient.email ?? "");
-      setHomeownerPhone(urlClient.phone ?? "");
+    if (urlClient) {
+      reset({
+        projectName: projectName || "",
+        homeownerName: urlClient.name,
+        homeownerEmail: urlClient.email ?? "",
+        homeownerPhone: urlClient.phone ?? "",
+        projectDescription: "",
+      });
     }
-  }, [urlClient, homeownerName, homeownerEmail]);
+  }, [urlClient, projectName, reset]);
+
+  // Update projectName in form when context changes
+  useEffect(() => {
+    const values = getValues();
+    if (values.projectName !== projectName) {
+      reset({
+        ...values,
+        projectName: projectName || "",
+      });
+    }
+  }, [projectName, getValues, reset]);
+
+  // Form state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Determine if we have an email (from client or manual entry)
-  const hasEmail = !!(selectedClient?.email || homeownerEmail.trim());
+  const hasEmail = !!(selectedClient?.email || watchedEmail?.trim());
 
   // Get the effective recipient data (client takes precedence)
-  const recipientName = selectedClient?.name || homeownerName;
-  const recipientEmail = selectedClient?.email || homeownerEmail;
-  const recipientPhone = selectedClient?.phone || homeownerPhone;
+  const recipientName = selectedClient?.name || watchedName;
+  const recipientEmail = selectedClient?.email || watchedEmail;
+  const recipientPhone = selectedClient?.phone || watch("homeownerPhone");
+  const notes = watch("projectDescription");
 
   // Validation - only validate manual fields when no client
-  const isEmailValid = !selectedClient && homeownerEmail ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(homeownerEmail) : true;
-  const canSubmit = selectedClient ? true : (homeownerName.trim() !== "" && homeownerEmail.trim() !== "" && isEmailValid);
+  const canSubmit = selectedClient ? true : (watchedName?.trim() !== "" && watchedEmail?.trim() !== "");
 
   // Build PDF data for email
   const buildPdfData = useCallback((): EstimatePDFData | null => {
@@ -182,7 +224,19 @@ export function ProjectSendEstimate() {
   ]);
 
   const handleSubmit = useCallback(async () => {
+    // If no client selected, validate the form
+    if (!selectedClient) {
+      const isValid = await trigger();
+      if (!isValid) return;
+    }
+
     if (!user || !canSubmit) return;
+
+    // Sync project name to context
+    const formValues = getValues();
+    if (formValues.projectName) {
+      setProjectName(formValues.projectName);
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -192,7 +246,7 @@ export function ProjectSendEstimate() {
       const project = await createProject.mutateAsync({
         contractorId: user.id,
         clientId: clientId ?? undefined,
-        name: projectName || "Multi-Trade Project",
+        name: formValues.projectName || projectName || "Multi-Trade Project",
         homeownerName: recipientName || "",
         homeownerEmail: recipientEmail || "",
         homeownerPhone: recipientPhone || undefined,
@@ -246,7 +300,7 @@ export function ProjectSendEstimate() {
           homeownerName: recipientName || "",
           homeownerEmail: recipientEmail || "",
           homeownerPhone: recipientPhone || undefined,
-          projectDescription: `${projectName} - ${tradeType.replace("_", " ")}`,
+          projectDescription: `${formValues.projectName || projectName} - ${tradeType.replace("_", " ")}`,
           parameters,
           rangeLow: totals.total,
           rangeHigh: totals.total,
@@ -263,7 +317,7 @@ export function ProjectSendEstimate() {
             recipientEmail: recipientEmail.trim(),
             recipientName: recipientName?.trim() || "",
             recipientPhone: recipientPhone?.trim() || undefined,
-            projectName: projectName || "Multi-Trade Project",
+            projectName: formValues.projectName || projectName || "Multi-Trade Project",
             projectDescription: notes || undefined,
             rangeLow: projectTotals.combinedTotal,
             rangeHigh: projectTotals.combinedTotal,
@@ -285,8 +339,12 @@ export function ProjectSendEstimate() {
       setIsSubmitting(false);
     }
   }, [
+    selectedClient,
+    trigger,
     user,
     canSubmit,
+    getValues,
+    setProjectName,
     createProject,
     clientId,
     projectName,
@@ -346,13 +404,21 @@ export function ProjectSendEstimate() {
             <div className="relative">
               <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
+                {...register("projectName")}
                 type="text"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
                 placeholder="e.g., Kitchen Renovation"
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
+                className={cn(
+                  "w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-0",
+                  errors.projectName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-blue-500"
+                )}
               />
             </div>
+            {errors.projectName && (
+              <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                {errors.projectName.message as string}
+              </p>
+            )}
           </div>
 
           {/* Selected Client Display - shows when client is selected */}
@@ -402,13 +468,21 @@ export function ProjectSendEstimate() {
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
+                    {...register("homeownerName")}
                     type="text"
-                    value={homeownerName}
-                    onChange={(e) => setHomeownerName(e.target.value)}
                     placeholder="John Smith"
-                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
+                    className={cn(
+                      "w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-0",
+                      errors.homeownerName ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-blue-500"
+                    )}
                   />
                 </div>
+                {errors.homeownerName && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.homeownerName.message as string}
+                  </p>
+                )}
               </div>
 
               {/* Homeowner email */}
@@ -419,21 +493,19 @@ export function ProjectSendEstimate() {
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
+                    {...register("homeownerEmail")}
                     type="email"
-                    value={homeownerEmail}
-                    onChange={(e) => setHomeownerEmail(e.target.value)}
                     placeholder="john@example.com"
                     className={cn(
                       "w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:ring-0",
-                      homeownerEmail && !isEmailValid
-                        ? "border-red-300 focus:border-red-500"
-                        : "border-gray-200 focus:border-blue-500"
+                      errors.homeownerEmail ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-blue-500"
                     )}
                   />
                 </div>
-                {homeownerEmail && !isEmailValid && (
-                  <p className="mt-1 text-sm text-red-500">
-                    Please enter a valid email address
+                {errors.homeownerEmail && (
+                  <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.homeownerEmail.message as string}
                   </p>
                 )}
               </div>
@@ -446,9 +518,8 @@ export function ProjectSendEstimate() {
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
+                    {...register("homeownerPhone")}
                     type="tel"
-                    value={homeownerPhone}
-                    onChange={(e) => setHomeownerPhone(e.target.value)}
                     placeholder="(555) 123-4567"
                     className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0"
                   />
@@ -463,8 +534,7 @@ export function ProjectSendEstimate() {
               Notes (optional)
             </label>
             <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              {...register("projectDescription")}
               placeholder="Any additional notes about the project..."
               rows={3}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0 resize-none"

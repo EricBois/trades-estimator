@@ -2,13 +2,35 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Minus, Plus, Hammer, Clock } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
+import { ZodForm } from "@/components/ui/ZodForm";
 
+const laborOnlyStepSchema = z.object({
+  directSqft: z.number().min(0).optional(),
+  directHours: z.number().min(0).optional(),
+});
+
+// Wrapper component that provides ZodForm context
 export function HangingLaborOnlyStep() {
+  const { directSqft, directHours } = useHangingEstimate();
+
+  return (
+    <ZodForm
+      schema={laborOnlyStepSchema}
+      defaultValues={{ directSqft, directHours }}
+    >
+      <HangingLaborOnlyStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function HangingLaborOnlyStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const {

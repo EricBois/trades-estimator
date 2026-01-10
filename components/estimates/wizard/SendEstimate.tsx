@@ -3,8 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWizard } from "react-use-wizard";
-import { z } from "zod";
-import { Mail, User, Phone, FileText, Users, Edit2 } from "lucide-react";
+import { Mail, User, Phone, FileText, Users, Edit2, AlertCircle } from "lucide-react";
 import { useWizardData } from "./WizardDataContext";
 import { useWizardFooter } from "./WizardFooterContext";
 import { useCreateEstimate, useSendEstimateEmail } from "@/hooks";
@@ -16,9 +15,39 @@ import {
 } from "@/lib/estimateCalculations";
 import { WIZARD_TRADE_TYPES, WIZARD_COMPLEXITY_LEVELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { sendEstimateSchema } from "@/lib/schemas/wizard";
+import { ZodForm, useZodForm } from "@/components/ui/ZodForm";
 import type { EstimatePDFData, PDFLineItem } from "@/lib/pdf/types";
 
+// Wrapper component that provides ZodForm context
 export function SendEstimate() {
+  const {
+    estimateName,
+    homeownerName,
+    homeownerEmail,
+    homeownerPhone,
+    projectDescription,
+  } = useWizardData();
+
+  return (
+    <ZodForm
+      schema={sendEstimateSchema}
+      defaultValues={{
+        estimateName: estimateName || "",
+        homeownerName: homeownerName || "",
+        homeownerEmail: homeownerEmail || "",
+        homeownerPhone: homeownerPhone || "",
+        projectDescription: projectDescription || "",
+      }}
+      resetOnDefaultValueChange
+    >
+      <SendEstimateContent />
+    </ZodForm>
+  );
+}
+
+// Content component that uses useZodForm for form access
+function SendEstimateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { goToStep } = useWizard();
@@ -33,14 +62,17 @@ export function SendEstimate() {
     parameters,
     complexity,
     clientId,
-    estimateName,
-    homeownerName,
-    homeownerEmail,
-    homeownerPhone,
-    projectDescription,
+    estimateName: contextEstimateName,
+    homeownerName: contextHomeownerName,
+    homeownerEmail: contextHomeownerEmail,
+    homeownerPhone: contextHomeownerPhone,
+    projectDescription: contextProjectDescription,
     pdfDetailLevel,
     updateData,
   } = useWizardData();
+
+  // Get form methods from ZodForm context
+  const { register, formState: { errors }, trigger, getValues, reset, watch } = useZodForm();
 
   // Fetch selected client details for display
   const { data: selectedClient } = useClient(clientId ?? undefined);
@@ -56,27 +88,60 @@ export function SendEstimate() {
     }
   }, [urlClientId, clientId, updateData]);
 
-  // Auto-fill homeowner fields when client is loaded from URL
+  // Watch form values for real-time updates
+  const watchedEmail = watch("homeownerEmail");
+  const watchedName = watch("homeownerName");
+  const watchedPhone = watch("homeownerPhone");
+  const watchedDescription = watch("projectDescription");
+
+  // Auto-fill form when client is loaded from URL
   useEffect(() => {
-    if (urlClient && !homeownerName && !homeownerEmail) {
+    if (urlClient && !watchedName && !watchedEmail) {
+      reset({
+        estimateName: contextEstimateName || "",
+        homeownerName: urlClient.name,
+        homeownerEmail: urlClient.email ?? "",
+        homeownerPhone: urlClient.phone ?? "",
+        projectDescription: contextProjectDescription || "",
+      });
+      // Also update context
       updateData({
+        clientId: urlClientId,
         homeownerName: urlClient.name,
         homeownerEmail: urlClient.email ?? "",
         homeownerPhone: urlClient.phone ?? "",
       });
     }
-  }, [urlClient, homeownerName, homeownerEmail, updateData]);
+  }, [urlClient, urlClientId, watchedName, watchedEmail, contextEstimateName, contextProjectDescription, reset, updateData]);
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Sync context changes to form (e.g., when navigating back and forth)
+  useEffect(() => {
+    const currentValues = getValues();
+    if (
+      currentValues.estimateName !== contextEstimateName ||
+      currentValues.homeownerName !== contextHomeownerName ||
+      currentValues.homeownerEmail !== contextHomeownerEmail
+    ) {
+      reset({
+        estimateName: contextEstimateName || "",
+        homeownerName: contextHomeownerName || "",
+        homeownerEmail: contextHomeownerEmail || "",
+        homeownerPhone: contextHomeownerPhone || "",
+        projectDescription: contextProjectDescription || "",
+      });
+    }
+  }, [contextEstimateName, contextHomeownerName, contextHomeownerEmail, contextHomeownerPhone, contextProjectDescription, getValues, reset]);
+
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Determine if we have an email (from client or manual entry)
-  const hasEmail = !!(selectedClient?.email || homeownerEmail.trim());
+  // Determine if we have an email (from client or form)
+  const hasEmail = !!(selectedClient?.email || watchedEmail?.trim());
 
   // Get the effective recipient data (client takes precedence)
-  const recipientName = selectedClient?.name || homeownerName;
-  const recipientEmail = selectedClient?.email || homeownerEmail;
-  const recipientPhone = selectedClient?.phone || homeownerPhone;
+  const recipientName = selectedClient?.name || watchedName;
+  const recipientEmail = selectedClient?.email || watchedEmail;
+  const recipientPhone = selectedClient?.phone || watchedPhone;
 
   // Calculate estimate range
   const estimateRange = useMemo(() => {
@@ -142,7 +207,7 @@ export function SendEstimate() {
         phone: recipientPhone || undefined,
       },
       projectName: tradeLabel,
-      projectDescription: projectDescription || undefined,
+      projectDescription: watchedDescription || undefined,
       singleTrade: {
         tradeType: tradeType ?? "",
         tradeLabel,
@@ -170,35 +235,35 @@ export function SendEstimate() {
     recipientName,
     recipientEmail,
     recipientPhone,
-    projectDescription,
+    watchedDescription,
   ]);
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-
-    // Only validate manual entry fields if no client is selected
+  const handleSubmit = useCallback(async () => {
+    // If no client selected, validate the form
     if (!selectedClient) {
-      if (!homeownerName.trim()) {
-        newErrors.homeownerName = "Name is required";
-      }
-      if (!homeownerEmail.trim()) {
-        newErrors.homeownerEmail = "Email is required";
-      } else if (!z.string().email().safeParse(homeownerEmail).success) {
-        newErrors.homeownerEmail = "Please enter a valid email";
-      }
+      const isValid = await trigger();
+      if (!isValid) return;
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    if (!estimateRange || !profile || !tradeType || !pdfData) return;
 
-  const handleSubmit = useCallback(async () => {
-    if (!validate() || !estimateRange || !profile || !tradeType || !pdfData) return;
+    // Get current form values
+    const formValues = getValues();
+
+    // Sync to context before submitting
+    updateData({
+      estimateName: formValues.estimateName || "",
+      homeownerName: formValues.homeownerName || "",
+      homeownerEmail: formValues.homeownerEmail || "",
+      homeownerPhone: formValues.homeownerPhone || "",
+      projectDescription: formValues.projectDescription || "",
+    });
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
-      // Create the estimate first
+      // Create the estimate
       const estimate = await createEstimate.mutateAsync({
         contractorId: profile.id,
         clientId: clientId ?? undefined,
@@ -207,7 +272,7 @@ export function SendEstimate() {
         homeownerName: recipientName?.trim() || "",
         homeownerEmail: recipientEmail?.trim() || "",
         homeownerPhone: recipientPhone?.trim() || undefined,
-        projectDescription: projectDescription.trim() || undefined,
+        projectDescription: formValues.projectDescription?.trim() || undefined,
         parameters: { ...parameters, complexity },
         rangeLow: estimateRange.low,
         rangeHigh: estimateRange.high,
@@ -221,30 +286,31 @@ export function SendEstimate() {
           recipientName: recipientName?.trim() || "",
           recipientPhone: recipientPhone?.trim() || undefined,
           projectName: tradeLabel,
-          projectDescription: projectDescription.trim() || undefined,
+          projectDescription: formValues.projectDescription?.trim() || undefined,
           rangeLow: estimateRange.low,
           rangeHigh: estimateRange.high,
           pdfData,
           detailLevel: pdfDetailLevel,
         });
       } catch (emailError) {
-        // Log but don't fail the whole operation - estimate was created
+        // Log but don't fail - estimate was created
         console.error("Failed to send email:", emailError);
-        // Still redirect, estimate was created
       }
 
       router.push(`/estimates/${estimate.id}`);
     } catch (error) {
       console.error("Failed to create estimate:", error);
-      setErrors({
-        submit:
-          error instanceof Error ? error.message : "Failed to create estimate",
-      });
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to create estimate"
+      );
     } finally {
       setIsSubmitting(false);
     }
   }, [
-    validate,
+    selectedClient,
+    trigger,
+    getValues,
+    updateData,
     estimateRange,
     profile,
     tradeType,
@@ -255,7 +321,6 @@ export function SendEstimate() {
     recipientName,
     recipientEmail,
     recipientPhone,
-    projectDescription,
     parameters,
     complexity,
     pdfData,
@@ -266,13 +331,11 @@ export function SendEstimate() {
 
   // Use ref to avoid useEffect dependency on handleSubmit
   const handleSubmitRef = useRef(handleSubmit);
-
-  // Update ref in an effect to satisfy linter
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   });
 
-  // Configure footer - always show Send Estimate but disable when no email
+  // Configure footer
   useEffect(() => {
     setFooterConfig({
       onContinue: () => handleSubmitRef.current(),
@@ -311,9 +374,8 @@ export function SendEstimate() {
             Estimate Name <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <input
+            {...register("estimateName")}
             type="text"
-            value={estimateName}
-            onChange={(e) => updateData({ estimateName: e.target.value })}
             placeholder="e.g., Kitchen Drywall"
             className={cn(
               "w-full min-h-[56px] px-4 py-3 text-base",
@@ -323,7 +385,7 @@ export function SendEstimate() {
           />
         </div>
 
-        {/* Selected Client Display - shows when client is selected */}
+        {/* Selected Client Display */}
         {selectedClient ? (
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <div className="flex items-start justify-between">
@@ -360,7 +422,6 @@ export function SendEstimate() {
             </div>
           </div>
         ) : (
-          /* Manual entry fields - show when no client selected */
           <>
             {/* Name */}
             <div>
@@ -369,9 +430,8 @@ export function SendEstimate() {
                 Name
               </label>
               <input
+                {...register("homeownerName")}
                 type="text"
-                value={homeownerName}
-                onChange={(e) => updateData({ homeownerName: e.target.value })}
                 placeholder="John Smith"
                 className={cn(
                   "w-full min-h-[56px] px-4 py-3 text-base",
@@ -381,7 +441,10 @@ export function SendEstimate() {
                 )}
               />
               {errors.homeownerName && (
-                <p className="mt-1 text-sm text-red-600">{errors.homeownerName}</p>
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.homeownerName.message as string}
+                </p>
               )}
             </div>
 
@@ -392,9 +455,8 @@ export function SendEstimate() {
                 Email
               </label>
               <input
+                {...register("homeownerEmail")}
                 type="email"
-                value={homeownerEmail}
-                onChange={(e) => updateData({ homeownerEmail: e.target.value })}
                 placeholder="john@example.com"
                 inputMode="email"
                 className={cn(
@@ -405,20 +467,22 @@ export function SendEstimate() {
                 )}
               />
               {errors.homeownerEmail && (
-                <p className="mt-1 text-sm text-red-600">{errors.homeownerEmail}</p>
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.homeownerEmail.message as string}
+                </p>
               )}
             </div>
 
-            {/* Phone (optional) */}
+            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Phone className="w-4 h-4 inline mr-2" />
                 Phone <span className="text-gray-400 font-normal">(optional)</span>
               </label>
               <input
+                {...register("homeownerPhone")}
                 type="tel"
-                value={homeownerPhone}
-                onChange={(e) => updateData({ homeownerPhone: e.target.value })}
                 placeholder="(555) 555-5555"
                 inputMode="tel"
                 className={cn(
@@ -431,15 +495,14 @@ export function SendEstimate() {
           </>
         )}
 
-        {/* Notes (optional) */}
+        {/* Notes */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <FileText className="w-4 h-4 inline mr-2" />
             Notes <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <textarea
-            value={projectDescription}
-            onChange={(e) => updateData({ projectDescription: e.target.value })}
+            {...register("projectDescription")}
             placeholder="Any additional notes about the project..."
             rows={3}
             className={cn(
@@ -452,9 +515,9 @@ export function SendEstimate() {
       </div>
 
       {/* Submit Error */}
-      {errors.submit && (
+      {submitError && (
         <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-4">
-          <p className="text-sm text-red-700">{errors.submit}</p>
+          <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
     </div>

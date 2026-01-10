@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import {
   Plus,
   Minus,
@@ -31,6 +32,9 @@ import {
   useContractorMaterials,
   usePresetsWithOverrides,
 } from "@/hooks/useContractorMaterials";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const materialsStepSchema = z.object({}).passthrough();
 
 // Icon mapping for categories
 const CategoryIcon = ({
@@ -74,7 +78,21 @@ function mapToFinishingCategory(dbCategory: string): FinishingMaterialCategory {
   return dbCategory as FinishingMaterialCategory;
 }
 
+// Wrapper component that provides ZodForm context
 export function DrywallMaterialsStep({
+  finishingEstimate,
+}: {
+  finishingEstimate?: UseDrywallFinishingEstimateReturn;
+}) {
+  return (
+    <ZodForm schema={materialsStepSchema} defaultValues={{}}>
+      <DrywallMaterialsStepContent finishingEstimate={finishingEstimate} />
+    </ZodForm>
+  );
+}
+
+// Content component
+function DrywallMaterialsStepContent({
   finishingEstimate,
 }: {
   finishingEstimate?: UseDrywallFinishingEstimateReturn;

@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Plus, Minus } from "lucide-react";
 import { useWizardData } from "./WizardDataContext";
 import { useWizardFooter } from "./WizardFooterContext";
@@ -11,6 +12,10 @@ import {
   formatCurrency,
 } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+// Dynamic schema - fields come from template
+const quantityStepSchema = z.object({}).passthrough();
 
 interface SelectOption {
   value: string;
@@ -39,7 +44,22 @@ function normalizeOptions(
   });
 }
 
+// Wrapper component that provides ZodForm context
 export function QuantityStep() {
+  const { parameters } = useWizardData();
+
+  return (
+    <ZodForm
+      schema={quantityStepSchema}
+      defaultValues={parameters}
+    >
+      <QuantityStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function QuantityStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const { template, parameters, setParameter, complexity } = useWizardData();

@@ -2,14 +2,35 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { User, Mail, Phone } from "lucide-react";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
 import { useWizardFooter } from "../WizardFooterContext";
 import { ClientSelector } from "@/components/clients/ClientSelector";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { useClient } from "@/hooks/useClients";
+import { ZodForm } from "@/components/ui/ZodForm";
 
+const clientStepSchema = z.object({
+  clientId: z.string().nullable().optional(),
+});
+
+// Wrapper component that provides ZodForm context
 export function ProjectClientStep() {
+  const { clientId } = useProjectEstimateContext();
+
+  return (
+    <ZodForm
+      schema={clientStepSchema}
+      defaultValues={{ clientId: clientId || null }}
+    >
+      <ProjectClientStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function ProjectClientStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const { clientId, setClientId } = useProjectEstimateContext();

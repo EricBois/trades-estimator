@@ -8,6 +8,8 @@ import { useWizardFooter } from "./WizardFooterContext";
 import { useTemplates } from "@/hooks/useTemplates";
 import { DEFAULT_WIZARD_TEMPLATES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { templateStepSchema } from "@/lib/schemas/wizard";
+import { ZodForm, useZodForm } from "@/components/ui/ZodForm";
 
 // Template interface that combines DB templates and default templates
 interface WizardTemplate {
@@ -32,11 +34,35 @@ const PRICING_TYPE_STYLES: Record<
   hybrid: { bg: "bg-purple-100", text: "text-purple-700", label: "Hybrid" },
 };
 
+// Wrapper component that provides ZodForm context
 export function TemplateStep() {
+  const { estimateName } = useWizardData();
+
+  return (
+    <ZodForm
+      schema={templateStepSchema}
+      defaultValues={{ estimateName: estimateName || "" }}
+    >
+      <TemplateStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function TemplateStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const { tradeType, setTemplate, estimateName, updateData } = useWizardData();
   const { data: userTemplates, isLoading } = useTemplates();
+  const { register, watch } = useZodForm();
+
+  // Sync form value to context
+  const watchedName = watch("estimateName");
+  useEffect(() => {
+    if (watchedName !== estimateName) {
+      updateData({ estimateName: watchedName });
+    }
+  }, [watchedName, estimateName, updateData]);
 
   // Configure footer (Continue is disabled since user must select a template)
   const handleContinue = useCallback(() => nextStep(), [nextStep]);
@@ -119,9 +145,8 @@ export function TemplateStep() {
           Estimate Name (optional)
         </label>
         <input
+          {...register("estimateName")}
           type="text"
-          value={estimateName}
-          onChange={(e) => updateData({ estimateName: e.target.value })}
           placeholder="e.g., Smith Kitchen Remodel"
           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />

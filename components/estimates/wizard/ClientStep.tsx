@@ -3,13 +3,34 @@
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
 import { User, Mail, Phone } from "lucide-react";
+import { z } from "zod";
 import { useWizardData } from "./WizardDataContext";
 import { useWizardFooter } from "./WizardFooterContext";
 import { ClientSelector } from "@/components/clients/ClientSelector";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { useClient } from "@/hooks/useClients";
+import { ZodForm } from "@/components/ui/ZodForm";
 
+const clientStepSchema = z.object({
+  clientId: z.string().nullable().optional(),
+});
+
+// Wrapper component that provides ZodForm context
 export function ClientStep() {
+  const { clientId } = useWizardData();
+
+  return (
+    <ZodForm
+      schema={clientStepSchema}
+      defaultValues={{ clientId: clientId || null }}
+    >
+      <ClientStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function ClientStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const { clientId, updateData } = useWizardData();

@@ -2,12 +2,18 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Calculator, Grid3X3, Hammer, FileText } from "lucide-react";
 import { useHangingEstimate } from "./HangingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import { HangingInputMode } from "@/lib/trades/drywallHanging/types";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { OptionCard } from "@/components/ui/OptionCard";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const hangingInputModeSchema = z.object({
+  estimateName: z.string().optional(),
+});
 
 const INPUT_MODES = [
   {
@@ -35,7 +41,26 @@ interface HangingInputModeStepProps {
   onEstimateNameChange?: (name: string) => void;
 }
 
+// Wrapper component that provides ZodForm context
 export function HangingInputModeStep({
+  estimateName = "",
+  onEstimateNameChange,
+}: HangingInputModeStepProps) {
+  return (
+    <ZodForm
+      schema={hangingInputModeSchema}
+      defaultValues={{ estimateName }}
+    >
+      <HangingInputModeStepContent
+        estimateName={estimateName}
+        onEstimateNameChange={onEstimateNameChange}
+      />
+    </ZodForm>
+  );
+}
+
+// Content component
+function HangingInputModeStepContent({
   estimateName = "",
   onEstimateNameChange,
 }: HangingInputModeStepProps) {

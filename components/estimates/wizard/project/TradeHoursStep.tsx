@@ -2,16 +2,35 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Clock, Minus, Plus } from "lucide-react";
 import { useProjectEstimateContext } from "./ProjectEstimateContext";
 import { useWizardFooter } from "../WizardFooterContext";
 import { ProjectTradeType, getTradeDisplayInfo } from "@/lib/project/types";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const tradeHoursSchema = z.object({
+  hours: z.number().min(0).optional(),
+});
 
 const QUICK_HOURS = [1, 2, 4, 8];
 
+// Wrapper component that provides ZodForm context
 export function TradeHoursStep({ tradeType }: { tradeType: ProjectTradeType }) {
+  return (
+    <ZodForm
+      schema={tradeHoursSchema}
+      defaultValues={{ hours: 0 }}
+    >
+      <TradeHoursStepContent tradeType={tradeType} />
+    </ZodForm>
+  );
+}
+
+// Content component
+function TradeHoursStepContent({ tradeType }: { tradeType: ProjectTradeType }) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const { hangingEstimate, finishingEstimate, paintingEstimate } =

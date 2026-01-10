@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { z } from "zod";
 import { useHangingEstimate } from "./HangingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
 import { useCreateEstimate } from "@/hooks/useEstimates";
@@ -10,13 +9,42 @@ import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { StepHeader } from "@/components/ui/StepHeader";
+import { sendEstimateSchema } from "@/lib/schemas/wizard";
+import { ZodForm, useZodForm } from "@/components/ui/ZodForm";
+
+type SendFormData = {
+  homeownerName: string;
+  homeownerEmail: string;
+  homeownerPhone?: string;
+  projectDescription?: string;
+};
 
 interface HangingSendEstimateProps {
   estimateId?: string;
   estimateName?: string;
 }
 
+// Wrapper component that provides ZodForm context
 export function HangingSendEstimate({
+  estimateName,
+}: HangingSendEstimateProps) {
+  return (
+    <ZodForm
+      schema={sendEstimateSchema}
+      defaultValues={{
+        homeownerName: "",
+        homeownerEmail: "",
+        homeownerPhone: "",
+        projectDescription: "",
+      }}
+    >
+      <HangingSendEstimateContent estimateName={estimateName} />
+    </ZodForm>
+  );
+}
+
+// Content component
+function HangingSendEstimateContent({
   estimateName,
 }: HangingSendEstimateProps) {
   const router = useRouter();
@@ -34,30 +62,21 @@ export function HangingSendEstimate({
   } = useHangingEstimate();
   const createEstimate = useCreateEstimate();
 
-  const [homeownerName, setHomeownerName] = useState("");
-  const [homeownerEmail, setHomeownerEmail] = useState("");
-  const [homeownerPhone, setHomeownerPhone] = useState("");
-  const [projectDescription, setProjectDescription] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const {
+    register,
+    trigger,
+    getValues,
+    formState: { errors },
+  } = useZodForm();
 
-  const validate = useCallback(() => {
-    const newErrors: Record<string, string> = {};
-
-    if (!homeownerName.trim()) {
-      newErrors.homeownerName = "Name is required";
-    }
-    if (!homeownerEmail.trim()) {
-      newErrors.homeownerEmail = "Email is required";
-    } else if (!z.string().email().safeParse(homeownerEmail).success) {
-      newErrors.homeownerEmail = "Please enter a valid email";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [homeownerName, homeownerEmail]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = useCallback(async () => {
-    if (!validate() || !profile) return;
+    const isValid = await trigger();
+    if (!isValid || !profile) return;
+
+    const formData = getValues();
+    setSubmitError(null);
 
     try {
       // Prepare drywall hanging-specific parameters
@@ -116,10 +135,10 @@ export function HangingSendEstimate({
         contractorId: profile.id,
         templateType: "drywall_hanging",
         name: estimateName?.trim() || undefined,
-        homeownerName: homeownerName.trim(),
-        homeownerEmail: homeownerEmail.trim(),
-        homeownerPhone: homeownerPhone.trim() || undefined,
-        projectDescription: projectDescription.trim() || undefined,
+        homeownerName: formData.homeownerName.trim(),
+        homeownerEmail: formData.homeownerEmail.trim(),
+        homeownerPhone: formData.homeownerPhone?.trim() || undefined,
+        projectDescription: formData.projectDescription?.trim() || undefined,
         parameters,
         rangeLow: totals.total,
         rangeHigh: totals.total,
@@ -128,13 +147,13 @@ export function HangingSendEstimate({
       router.push(`/estimates/${estimate.id}`);
     } catch (error) {
       console.error("Failed to create estimate:", error);
-      setErrors({
-        submit:
-          error instanceof Error ? error.message : "Failed to create estimate",
-      });
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to create estimate"
+      );
     }
   }, [
-    validate,
+    trigger,
+    getValues,
     profile,
     inputMode,
     rooms,
@@ -146,10 +165,6 @@ export function HangingSendEstimate({
     totals,
     createEstimate,
     estimateName,
-    homeownerName,
-    homeownerEmail,
-    homeownerPhone,
-    projectDescription,
     router,
   ]);
 
@@ -196,9 +211,8 @@ export function HangingSendEstimate({
             Homeowner Name <span className="text-red-500">*</span>
           </label>
           <input
+            {...register("homeownerName")}
             type="text"
-            value={homeownerName}
-            onChange={(e) => setHomeownerName(e.target.value)}
             placeholder="John Smith"
             className={cn(
               "w-full h-14 px-4 text-lg border-2 rounded-xl",
@@ -207,7 +221,7 @@ export function HangingSendEstimate({
             )}
           />
           {errors.homeownerName && (
-            <p className="text-sm text-red-500 mt-1">{errors.homeownerName}</p>
+            <p className="text-sm text-red-500 mt-1">{errors.homeownerName.message as string}</p>
           )}
         </div>
 
@@ -217,9 +231,8 @@ export function HangingSendEstimate({
             Email <span className="text-red-500">*</span>
           </label>
           <input
+            {...register("homeownerEmail")}
             type="email"
-            value={homeownerEmail}
-            onChange={(e) => setHomeownerEmail(e.target.value)}
             placeholder="john@example.com"
             className={cn(
               "w-full h-14 px-4 text-lg border-2 rounded-xl",
@@ -228,7 +241,7 @@ export function HangingSendEstimate({
             )}
           />
           {errors.homeownerEmail && (
-            <p className="text-sm text-red-500 mt-1">{errors.homeownerEmail}</p>
+            <p className="text-sm text-red-500 mt-1">{errors.homeownerEmail.message as string}</p>
           )}
         </div>
 
@@ -238,9 +251,8 @@ export function HangingSendEstimate({
             Phone <span className="text-gray-400">(optional)</span>
           </label>
           <input
+            {...register("homeownerPhone")}
             type="tel"
-            value={homeownerPhone}
-            onChange={(e) => setHomeownerPhone(e.target.value)}
             placeholder="(555) 123-4567"
             className={cn(
               "w-full h-14 px-4 text-lg border-2 border-gray-200 rounded-xl",
@@ -256,8 +268,7 @@ export function HangingSendEstimate({
             <span className="text-gray-400">(optional)</span>
           </label>
           <textarea
-            value={projectDescription}
-            onChange={(e) => setProjectDescription(e.target.value)}
+            {...register("projectDescription")}
             placeholder="Any additional notes for the homeowner..."
             rows={3}
             className={cn(
@@ -268,9 +279,9 @@ export function HangingSendEstimate({
         </div>
 
         {/* Submit Error */}
-        {errors.submit && (
+        {submitError && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-            <p className="text-red-600 text-sm">{errors.submit}</p>
+            <p className="text-red-600 text-sm">{submitError}</p>
           </div>
         )}
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Plus, Minus } from "lucide-react";
 import { usePaintingEstimateSafe } from "./PaintingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
@@ -15,12 +16,29 @@ import { InlineOverrideInput } from "@/components/ui/InlineOverrideInput";
 import { CustomAddonInput } from "@/components/ui/CustomAddonInput";
 import { CustomAddonCard } from "@/components/ui/CustomAddonCard";
 import { cn } from "@/lib/utils";
+import { ZodForm } from "@/components/ui/ZodForm";
 
+const paintingAddonsSchema = z.object({}).passthrough();
+
+// Wrapper component that provides ZodForm context
 export function PaintingAddonsStep({
   paintingEstimate,
 }: {
   paintingEstimate?: UsePaintingEstimateReturn;
 } = {}) {
+  return (
+    <ZodForm schema={paintingAddonsSchema} defaultValues={{}}>
+      <PaintingAddonsStepContent paintingEstimate={paintingEstimate} />
+    </ZodForm>
+  );
+}
+
+// Content component
+function PaintingAddonsStepContent({
+  paintingEstimate,
+}: {
+  paintingEstimate?: UsePaintingEstimateReturn;
+}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
 

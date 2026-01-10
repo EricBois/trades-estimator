@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import { Check, Plus, Minus } from "lucide-react";
 import { useHangingEstimateSafe } from "./HangingEstimateContext";
 import { useWizardFooter } from "../../WizardFooterContext";
@@ -12,12 +13,29 @@ import {
 } from "@/lib/trades/drywallHanging/types";
 import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
+import { ZodForm } from "@/components/ui/ZodForm";
 
+const addonsStepSchema = z.object({}).passthrough();
+
+// Wrapper component that provides ZodForm context
 export function HangingAddonsStep({
   hangingEstimate,
 }: {
   hangingEstimate?: UseDrywallHangingEstimateReturn;
 } = {}) {
+  return (
+    <ZodForm schema={addonsStepSchema} defaultValues={{}}>
+      <HangingAddonsStepContent hangingEstimate={hangingEstimate} />
+    </ZodForm>
+  );
+}
+
+// Content component
+function HangingAddonsStepContent({
+  hangingEstimate,
+}: {
+  hangingEstimate?: UseDrywallHangingEstimateReturn;
+}) {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
 

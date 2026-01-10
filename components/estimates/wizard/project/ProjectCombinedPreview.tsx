@@ -50,6 +50,7 @@ function TradeBreakdown({
   const totals = tradeTotals[tradeType];
   const displayInfo = getTradeDisplayInfo(tradeType);
   const Icon = TRADE_ICONS[tradeType];
+  const [laborExpanded, setLaborExpanded] = useState(false);
 
   if (!totals) return null;
 
@@ -95,18 +96,46 @@ function TradeBreakdown({
               </span>
             </div>
           )}
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Labor</span>
-            <span className="text-gray-900">
-              {formatCurrency(totals.laborSubtotal)}
-            </span>
-          </div>
-          {directHours > 0 && (
-            <div className="flex justify-between text-sm text-gray-500 pl-4">
-              <span>
-                ({directHours} hrs × ${hourlyRate}/hr)
+          {/* Labor row - expandable when there are direct hours */}
+          {directHours > 0 ? (
+            <div>
+              <div
+                className="flex justify-between text-sm cursor-pointer hover:bg-gray-50 -mx-4 px-4 py-1"
+                onClick={() => setLaborExpanded(!laborExpanded)}
+              >
+                <span className="text-gray-600 flex items-center gap-1">
+                  Labor
+                  {laborExpanded ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </span>
+                <span className="text-gray-900">
+                  {formatCurrency(totals.laborSubtotal)}
+                </span>
+              </div>
+              {laborExpanded && (
+                <div className="pl-4 space-y-1 mt-1">
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <span>Base labor</span>
+                    <span>
+                      {formatCurrency(totals.laborSubtotal - directHours * hourlyRate)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <span>{directHours} hrs × ${hourlyRate}/hr</span>
+                    <span>{formatCurrency(directHours * hourlyRate)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Labor</span>
+              <span className="text-gray-900">
+                {formatCurrency(totals.laborSubtotal)}
               </span>
-              <span>{formatCurrency(directHours * hourlyRate)}</span>
             </div>
           )}
           {totals.addonsSubtotal > 0 && (

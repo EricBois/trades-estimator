@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useWizard } from "react-use-wizard";
+import { z } from "zod";
 import {
   Plus,
   Minus,
@@ -23,6 +24,9 @@ import { formatCurrency } from "@/lib/estimateCalculations";
 import { cn } from "@/lib/utils";
 import { MaterialToggle } from "@/components/ui/MaterialToggle";
 import { InlineOverrideInput } from "@/components/ui/InlineOverrideInput";
+import { ZodForm } from "@/components/ui/ZodForm";
+
+const lineItemsStepSchema = z.object({}).passthrough();
 
 // Icon mapping
 const ICONS: Record<string, typeof Clock> = {
@@ -38,7 +42,17 @@ function getIcon(iconName: string) {
   return ICONS[iconName] ?? Square;
 }
 
+// Wrapper component that provides ZodForm context
 export function DrywallLineItemsStep() {
+  return (
+    <ZodForm schema={lineItemsStepSchema} defaultValues={{}}>
+      <DrywallLineItemsStepContent />
+    </ZodForm>
+  );
+}
+
+// Content component
+function DrywallLineItemsStepContent() {
   const { nextStep } = useWizard();
   const { setFooterConfig } = useWizardFooter();
   const {
